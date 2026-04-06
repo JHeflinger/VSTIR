@@ -1,24 +1,29 @@
 #pragma once
 
 #include "util/safety.h"
-#include "vulkan/vcore.h"
+#include "core/renderer.h"
+#include <GLFW/glfw3.h>
 
 namespace VSTIR {
 
     class Editor {
     public:
-        Editor(size_t width, size_t height);
-        ~Editor();
+        Editor() {};
+        ~Editor() {};
     public:
-        void Run();
+        static Editor* Get();
+        static void Initialize(size_t width, size_t height);
+        static void Run();
+        static void Clean();
     public:
+        Renderer& GetRenderer() { return m_Renderer; }
         GLFWwindow* Window() { return m_Window; }
         size_t Width() { return m_Width; }
         size_t Height() { return m_Height; }
     private:
-        size_t m_Width;
-        size_t m_Height;
-        GLFWwindow* m_Window;
-        Scope<VCore> m_Vulkan;
+        size_t m_Width = 0;
+        size_t m_Height = 0;
+        GLFWwindow* m_Window = nullptr;
+        Renderer m_Renderer;
     };
 }

@@ -30,14 +30,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL _VulkanDebugCallback(
 
 namespace VSTIR {
 
-    VGeneral::VGeneral() {
-
-    }
-
-    VGeneral::~VGeneral() {
-
-    }
-
     void VGeneral::Initialize() {
         if (!VUTILS::CheckValidationLayerSupport()) FATAL("Requested validation layers are not available");
         std::vector<char*> required_extensions;

@@ -9,6 +9,8 @@ namespace VSTIR {
     }
 
     void Editor::Initialize(size_t width, size_t height) {
+        s_Editor.m_Width = width;
+        s_Editor.m_Height = height;
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // No OpenGL
         glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);

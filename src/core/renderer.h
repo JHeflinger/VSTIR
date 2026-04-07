@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vulkan/backend.h"
+#include "vulkan/vstructs.h"
 #include <cstddef>
 
 namespace VSTIR {
@@ -14,7 +15,9 @@ namespace VSTIR {
     public:
         void Initialize();
         Backend& GetBackend() { return m_Backend; }
+        CPUSwap& Swapchain() { return m_Swapchain; }
     private:
+        CPUSwap m_Swapchain;
         Backend m_Backend;
     };
 

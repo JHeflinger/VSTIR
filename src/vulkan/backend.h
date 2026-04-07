@@ -7,11 +7,12 @@ namespace VSTIR {
 
     class Backend {
     public:
-        Backend();
-        ~Backend();
+        Backend() {};
+        ~Backend() {};
     public:
         void Initialize();
         VMetadata& Metadata() { return m_Metadata; }
+        VCore& Core() { return m_Core; }
     private:
         VCore m_Core;
         VMetadata m_Metadata;

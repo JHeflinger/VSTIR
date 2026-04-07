@@ -1,6 +1,7 @@
 #include "vutil.h"
 #include "core/editor.h"
 #include "core/get.h"
+#include "util/log.h"
 #include <memory>
 #include <cstring>
 #include <vulkan/vulkan.h>
@@ -71,6 +72,53 @@ namespace VSTIR {
         }
         free(availableExtensions);
         return true;
+    }
+
+    void VUTILS::CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VulkanDataBuffer* buffer) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        VkResult result = vkCreateBuffer(_interface, &bufferInfo, nullptr, &(buffer->buffer));
+        ASSERT(result == VK_SUCCESS, "Unable to create buffer");
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(_interface, buffer->buffer, &memRequirements);
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        Schrodingnum memoryType = FindMemoryType(memRequirements.memoryTypeBits, properties);
+        ASSERT(memoryType.exists, "Unable to find memory for vertex buffer");
+        allocInfo.memoryTypeIndex = memoryType.value;
+        result = vkAllocateMemory(_interface, &allocInfo, nullptr, &(buffer->memory));
+        ASSERT(result == VK_SUCCESS, "Unable to allocate memory for buffer");
+        vkBindBufferMemory(_interface, buffer->buffer, buffer->memory, 0);
+    }
+
+    Schrodingnum VUTILS::FindMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+        Schrodingnum result{};
+        VkPhysicalDeviceMemoryProperties memProperties{};
+        vkGetPhysicalDeviceMemoryProperties(_gpu, &memProperties);
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) &&
+                (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                result.value = i;
+                result.exists = true;
+                break;
+            }
+        }
+        return result;
+    }
+
+    VkShaderModule VUTILS::CreateShader(SimpleFile* file) {
+        VkShaderModuleCreateInfo createInfo{};
+    	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    	createInfo.codeSize = file->size;
+    	createInfo.pCode = (const uint32_t*)(file->data);
+    	VkShaderModule shader;
+    	VkResult result = vkCreateShaderModule(_interface, &createInfo, nullptr, &shader);
+    	ASSERT(result == VK_SUCCESS, "Failed to create shader module");
+    	return shader;
     }
 
 }

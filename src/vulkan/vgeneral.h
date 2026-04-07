@@ -7,10 +7,12 @@ namespace VSTIR {
 
     class VGeneral {
     public:
-        VGeneral();
-        ~VGeneral();
+        VGeneral() {};
+        ~VGeneral() {};
     public:
         void Initialize();
+        VkDevice Interface() { return m_Interface; }
+        VkPhysicalDevice GPU() { return m_GPU; }
     private:
         VkDebugUtilsMessengerEXT m_Messenger;
         VkInstance m_Instance;

@@ -11,6 +11,11 @@ namespace VSTIR {
         uint32_t glfwCount = 0;
         const char** glfwExts = glfwGetRequiredInstanceExtensions(&glfwCount);
         for (uint32_t i = 0; i < glfwCount; i++) m_Extensions.required.push_back(glfwExts[i]);
+        #ifdef __APPLE__
+            m_Extensions.required.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+            m_Extensions.required.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+            m_Extensions.device.push_back("VK_KHR_portability_subset");
+        #endif
     }
 
 }

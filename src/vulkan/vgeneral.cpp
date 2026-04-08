@@ -50,6 +50,9 @@ namespace VSTIR {
         createInfo.pApplicationInfo = &appInfo;
         createInfo.enabledExtensionCount = (uint32_t)(_metadata.Extensions().required.size());
         createInfo.ppEnabledExtensionNames = required_extensions.data();
+        #ifdef __APPLE__
+            createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+        #endif
         VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
         createInfo.enabledLayerCount = _metadata.Validation().size();
         createInfo.ppEnabledLayerNames = validation_extensions.data();
@@ -89,7 +92,9 @@ namespace VSTIR {
             vkGetPhysicalDeviceFeatures(devices[i], &deviceFeatures);
             if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) curr_score += 10000;
             curr_score += deviceProperties.limits.maxImageDimension2D;
-            if (!deviceFeatures.geometryShader) curr_score = 0;
+            #ifndef __APPLE__
+                if (!deviceFeatures.geometryShader) curr_score = 0;
+            #endif
             if (!deviceFeatures.samplerAnisotropy) curr_score = 0;
             if (curr_score > score) {
                 score = curr_score;

@@ -13,7 +13,7 @@ namespace VSTIR {
         s_Editor.m_Height = height;
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // No OpenGL
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
         s_Editor.m_Window = glfwCreateWindow(width, height, "VSTIR", nullptr, nullptr);
         s_Editor.m_Renderer.Initialize();
     }
@@ -21,10 +21,8 @@ namespace VSTIR {
     void Editor::Run() {
         while (!glfwWindowShouldClose(s_Editor.m_Window)) {
             glfwPollEvents();
-            //m_Vulkan->Render();
-            break;
+            s_Editor.m_Renderer.Render();
         }
-        //m_Vulkan->Wait();
     }
 
     void Editor::Clean() {

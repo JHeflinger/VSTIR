@@ -1,5 +1,10 @@
 #version 450
 
-void main() {
+layout(binding = 0, rgba8) uniform image2D outputImage;
 
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+    if (gl_GlobalInvocationID.x < 500)
+        imageStore(outputImage, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.x), vec4(1, 0, 0, 1));
 }

@@ -14,7 +14,9 @@ namespace VSTIR {
         void Initialize();
         VGeneral& General() { return m_General; }
         VContext& Context() { return m_Context; }
+        VScheduler& Scheduler() { return m_Scheduler; }
         std::vector<VulkanShader>& Shaders() { return m_Shaders; }
+        VulkanDataBuffer& Bridge() { return m_Bridge; }
     private:
         void InitializeBridge();
         void InitializeShaders();

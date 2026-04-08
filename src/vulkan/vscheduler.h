@@ -10,6 +10,8 @@ namespace VSTIR {
         ~VScheduler() {};
     public:
         void Initialize();
+        VulkanCommands& Commands() { return m_Commands; }
+        VkQueue& Queue() { return m_Queue; }
     private:
         void InitializeSyncro();
         void InitializeCommands();

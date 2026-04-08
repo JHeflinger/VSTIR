@@ -10,3 +10,6 @@
 #define _swapchain (Editor::Get()->GetRenderer().Swapchain())
 #define _context (Editor::Get()->GetRenderer().GetBackend().Core().Context())
 #define _shaders (Editor::Get()->GetRenderer().GetBackend().Core().Shaders())
+#define _scheduler (Editor::Get()->GetRenderer().GetBackend().Core().Scheduler())
+#define _data (Editor::Get()->GetRenderer().GetBackend().Core().Context().Data())
+#define _core (Editor::Get()->GetRenderer().GetBackend().Core())

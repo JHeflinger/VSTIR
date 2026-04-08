@@ -13,7 +13,7 @@ namespace VSTIR {
         s_Editor.m_Height = height;
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API); // No OpenGL
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
         s_Editor.m_Window = glfwCreateWindow(width, height, "VSTIR", nullptr, nullptr);
         s_Editor.m_Renderer.Initialize();
     }

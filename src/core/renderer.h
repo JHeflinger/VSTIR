@@ -18,7 +18,7 @@ namespace VSTIR {
         Backend& GetBackend() { return m_Backend; }
         CPUSwap& Swapchain() { return m_Swapchain; }
     private:
-        void RecordCommand();
+        void RecordCommand(uint32_t imageIndex);
     private:
         CPUSwap m_Swapchain;
         Backend m_Backend;

@@ -12,6 +12,7 @@ namespace VSTIR {
         void Initialize();
         VulkanCommands& Commands() { return m_Commands; }
         VkQueue& Queue() { return m_Queue; }
+        VulkanSyncro& Syncro() { return m_Syncro; }
     private:
         void InitializeSyncro();
         void InitializeCommands();

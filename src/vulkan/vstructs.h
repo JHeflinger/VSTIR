@@ -53,6 +53,8 @@ namespace VSTIR {
 
     struct VulkanSyncro {
         VkFence fence;
+        VkSemaphore imageAvailable;
+        VkSemaphore renderFinished;
     };
 
     struct VulkanCommands {
@@ -109,6 +111,14 @@ namespace VSTIR {
         alignas(4) float fov;
         alignas(4) float width;
         alignas(4) float height;
+    };
+
+    struct VulkanSwapchain {
+        VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+        std::vector<VkImage> images;
+        std::vector<VkImageView> views;
+        VkFormat format;
+        VkExtent2D extent;
     };
 
 }

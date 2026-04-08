@@ -2,6 +2,8 @@
 
 #include "core/editor.h"
 
+#define _general (Editor::Get()->GetRenderer().GetBackend().Core().General())
+#define _window (Editor::Get()->Window())
 #define _metadata (Editor::Get()->GetRenderer().GetBackend().Metadata())
 #define _interface (Editor::Get()->GetRenderer().GetBackend().Core().General().Interface())
 #define _gpu (Editor::Get()->GetRenderer().GetBackend().Core().General().GPU())

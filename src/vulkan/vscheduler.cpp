@@ -16,6 +16,9 @@ namespace VSTIR {
         fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
         VkResult result = vkCreateFence(_interface, &fenceInfo, nullptr, &(m_Syncro.fence));
         if (result != VK_SUCCESS) FATAL("Failed to create fence");
+        VkSemaphoreCreateInfo sInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+        vkCreateSemaphore(_interface, &sInfo, nullptr, &m_Syncro.imageAvailable);
+        vkCreateSemaphore(_interface, &sInfo, nullptr, &m_Syncro.renderFinished);
     }
 
     void VScheduler::InitializeCommands() {

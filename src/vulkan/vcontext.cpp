@@ -7,6 +7,7 @@
 namespace VSTIR {
 
     void VContext::Initialize() {
+        InitializeSwapchain();
         InitializeTarget();
         m_Data.Initialize();
         InitializePipeline();
@@ -72,6 +73,53 @@ namespace VSTIR {
             VK_IMAGE_LAYOUT_UNDEFINED,
             VK_IMAGE_LAYOUT_GENERAL,
             1);
+    }
+
+    void VContext::InitializeSwapchain() {
+        VkSurfaceKHR surface = _general.Surface();
+        VkSurfaceCapabilitiesKHR caps;
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_gpu, surface, &caps);
+        uint32_t fmtCount;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(_gpu, surface, &fmtCount, nullptr);
+        std::vector<VkSurfaceFormatKHR> formats(fmtCount);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(_gpu, surface, &fmtCount, formats.data());
+        VkSurfaceFormatKHR chosen = formats[0];
+        for (auto& f : formats)
+            if (f.format == VK_FORMAT_B8G8R8A8_UNORM && f.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR)
+                { chosen = f; break; }
+
+        VkSwapchainCreateInfoKHR info{};
+        info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+        info.surface = surface;
+        info.minImageCount = std::min(caps.minImageCount + 1, caps.maxImageCount > 0 ? caps.maxImageCount : UINT32_MAX);
+        info.imageFormat = chosen.format;
+        info.imageColorSpace = chosen.colorSpace;
+        info.imageExtent = { (uint32_t)_width, (uint32_t)_height };
+        info.imageArrayLayers = 1;
+        info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        info.preTransform = caps.currentTransform;
+        info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+        info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+        info.clipped = VK_TRUE;
+
+        m_Swapchain.format = chosen.format;
+        m_Swapchain.extent = info.imageExtent;
+        vkCreateSwapchainKHR(_interface, &info, nullptr, &m_Swapchain.swapchain);
+
+        uint32_t imgCount; vkGetSwapchainImagesKHR(_interface, m_Swapchain.swapchain, &imgCount, nullptr);
+        m_Swapchain.images.resize(imgCount);
+        vkGetSwapchainImagesKHR(_interface, m_Swapchain.swapchain, &imgCount, m_Swapchain.images.data());
+        m_Swapchain.views.resize(imgCount);
+        for (uint32_t i = 0; i < imgCount; i++) {
+            VkImageViewCreateInfo vinfo{};
+            vinfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            vinfo.image = m_Swapchain.images[i];
+            vinfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            vinfo.format = chosen.format;
+            vinfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+            vkCreateImageView(_interface, &vinfo, nullptr, &m_Swapchain.views[i]);
+        }
     }
 
 }

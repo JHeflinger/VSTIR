@@ -30,7 +30,6 @@ namespace VSTIR {
         uint32_t imgw = _width;
         uint32_t imgh = _height;
         RayGenerator* raygens = (RayGenerator*)calloc(imgw * imgh, sizeof(RayGenerator));
-        for (size_t i = 0; i < imgw * imgh; i++) raygens[i].tid = (uint32_t)-1;
 
         VkDeviceSize bufferSize = sizeof(RayGenerator) * imgw * imgh;
         VulkanDataBuffer stagingBuffer;
@@ -152,6 +151,9 @@ namespace VSTIR {
         ubo.width = _width;
         ubo.height = _height;
         ubo.seed = random_u32();
+        if (Editor::Get()->Reset()) m_Samples = 0; 
+        ubo.samples = m_Samples;
+        m_Samples++;
         ubo.fov = _renderer.GetCamera().fov;
         ubo.position = _renderer.GetCamera().position;
         ubo.look = glm::normalize(_renderer.GetCamera().look - ubo.position);

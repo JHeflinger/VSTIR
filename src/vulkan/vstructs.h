@@ -9,8 +9,7 @@
 namespace VSTIR {
 
     struct RayGenerator {
-        alignas(4) uint32_t tid; // dummy values for now - use what is needed for ReSTIR later
-        alignas(4) float distance;
+        alignas(16) glm::vec3 accumulation;
     };
 
     typedef enum {
@@ -108,6 +107,7 @@ namespace VSTIR {
         alignas(16) glm::vec3 w;
         alignas(4) uint32_t triangles;
         alignas(4) uint32_t seed;
+        alignas(4) uint32_t samples;
         alignas(4) float fov;
         alignas(4) float width;
         alignas(4) float height;

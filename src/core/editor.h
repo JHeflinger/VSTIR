@@ -21,10 +21,13 @@ namespace VSTIR {
         GLFWwindow* Window() { return m_Window; }
         size_t Width() { return m_Width; }
         size_t Height() { return m_Height; }
+        bool Reset() { bool r = m_Reset; m_Reset = false; return r; }
     private:
         size_t m_Width = 0;
         size_t m_Height = 0;
         GLFWwindow* m_Window = nullptr;
         Renderer m_Renderer;
+        double m_ScrollDelta = 0.0;
+        bool m_Reset = false;
     };
 }

@@ -13,6 +13,7 @@ namespace VSTIR {
         void Reconstruct();
         VulkanDescriptors* Descriptors() { return m_Descriptors; }
         UBOArray& UBOs() { return m_UBOs; }
+        VulkanDataBuffer& SSBO() { return m_SSBO; }
         void UpdateDescriptors();
         void UpdateUBOs();
     private:
@@ -23,6 +24,7 @@ namespace VSTIR {
         VulkanDescriptors* m_Descriptors;
         UBOArray m_UBOs;
         VulkanDataBuffer m_SSBO;
+        uint32_t m_Samples = 0;
     };
 
 }

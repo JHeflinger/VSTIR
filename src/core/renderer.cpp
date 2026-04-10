@@ -709,17 +709,28 @@ namespace VSTIR {
             vkCmdPipelineBarrier(_scheduler.Commands().command,
                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                 0, 0, nullptr, 0, nullptr, 1, &toTransferDst);
+            int winW, winH;
+            glfwGetFramebufferSize(_window, &winW, &winH);
+            float scaleX = (float)_width  / (float)winW;
+            float scaleY = (float)_height / (float)winH;
+            float scale  = (scaleX < scaleY) ? scaleX : scaleY;
+            float srcW = winW * scale;
+            float srcH = winH * scale;
+            int32_t srcX0 = (int32_t)(((float)_width  - srcW) * 0.5f);
+            int32_t srcY0 = (int32_t)(((float)_height - srcH) * 0.5f);
+            int32_t srcX1 = srcX0 + (int32_t)srcW;
+            int32_t srcY1 = srcY0 + (int32_t)srcH;
             VkImageBlit blit{};
             blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-            blit.srcOffsets[0]  = { 0, 0, 0 };
-            blit.srcOffsets[1]  = { (int32_t)_width, (int32_t)_height, 1 };
+            blit.srcOffsets[0]  = { srcX0, srcY0, 0 };
+            blit.srcOffsets[1]  = { srcX1, srcY1, 1 };
             blit.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
             blit.dstOffsets[0]  = { 0, 0, 0 };
             blit.dstOffsets[1]  = { (int32_t)_width, (int32_t)_height, 1 };
             vkCmdBlitImage(_scheduler.Commands().command,
                 _context.Target().image, VK_IMAGE_LAYOUT_GENERAL,
                 swapImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                1, &blit, VK_FILTER_NEAREST);
+                1, &blit, VK_FILTER_LINEAR);
             VkImageMemoryBarrier toPresent = toTransferDst;
             toPresent.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
             toPresent.dstAccessMask = 0;

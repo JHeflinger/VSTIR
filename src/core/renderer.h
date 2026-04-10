@@ -28,7 +28,6 @@ namespace VSTIR {
         CPUSwap m_Swapchain;
         Backend m_Backend;
         Geometry m_Geometry;
-        std::vector<NodeBVH> m_BVH;
         Camera m_Camera;
     };
 

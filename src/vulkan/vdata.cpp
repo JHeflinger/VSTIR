@@ -157,8 +157,8 @@ namespace VSTIR {
         ubo.look = glm::normalize(_renderer.GetCamera().look - ubo.position);
         ubo.up = glm::normalize(_renderer.GetCamera().up);
         ubo.w = -ubo.look;
-        ubo.u = glm::cross(ubo.up, ubo.w);
-        ubo.v = glm::cross(ubo.w, ubo.u);
+        ubo.u = glm::normalize(glm::cross(ubo.up, ubo.w));
+        ubo.v = glm::normalize(glm::cross(ubo.w, ubo.u));
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 

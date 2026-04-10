@@ -1,5 +1,6 @@
 #include "vcore.h"
 #include "core/get.h"
+#include "util/log.h"
 #include "vulkan/vutil.h"
 #include "vulkan/vshaders.h"
 

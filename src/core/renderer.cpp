@@ -529,7 +529,7 @@ namespace VSTIR {
         size_t vertices_start = m_Geometry.vertices.size();
         size_t normals_start = m_Geometry.normals.size();
         for (size_t i = 0; i < state.materials.size(); i++) {
-            ids.push_back(state.materials.size());
+            ids.push_back(i);
             m_Geometry.materials.push_back(state.materials[i]);
         }
         for (size_t i = 0; i < state.vertices.size(); i++)
@@ -620,13 +620,13 @@ namespace VSTIR {
         }
         if (!ConstructOBJ(state)) FATAL("Unable to construct .obj \"%s\" due to an error", filepath);
         VFILE::FreeFile(file);
+        m_Geometry.bvh = BVH::Create(m_Geometry.triangles, m_Geometry.vertices);
         m_Geometry.bvh_size = m_Geometry.bvh.size();
         m_Geometry.vertices_size = m_Geometry.vertices.size();
         m_Geometry.normals_size = m_Geometry.normals.size();
         m_Geometry.triangles_size = m_Geometry.triangles.size();
         m_Geometry.emissives_size = m_Geometry.emissives.size();
         m_Geometry.materials_size = m_Geometry.materials.size();
-        m_BVH = BVH::Create(m_Geometry.triangles, m_Geometry.vertices);
         m_Backend.Reconstruct();
     }
 

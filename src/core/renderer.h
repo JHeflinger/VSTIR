@@ -20,6 +20,7 @@ namespace VSTIR {
         Backend& GetBackend() { return m_Backend; }
         CPUSwap& Swapchain() { return m_Swapchain; }
         Geometry& GetGeometry() { return m_Geometry; }
+        Camera& GetCamera() { return m_Camera; }
     private:
         void RecordCommand(uint32_t imageIndex);
         bool ConstructOBJ(const StateOBJ state);
@@ -28,6 +29,7 @@ namespace VSTIR {
         Backend m_Backend;
         Geometry m_Geometry;
         std::vector<NodeBVH> m_BVH;
+        Camera m_Camera;
     };
 
 }

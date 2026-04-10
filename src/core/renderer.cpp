@@ -559,6 +559,11 @@ namespace VSTIR {
 
     void Renderer::Initialize() {
         m_Backend.Initialize();
+        m_Camera = (Camera){
+            glm::vec3(0.0f, 2.133f, 2.11f),
+            glm::vec3(0.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f, 1.0f, 0.0f),
+            90.0f};
     }
 
     void Renderer::Render() {
@@ -615,6 +620,12 @@ namespace VSTIR {
         }
         if (!ConstructOBJ(state)) FATAL("Unable to construct .obj \"%s\" due to an error", filepath);
         VFILE::FreeFile(file);
+        m_Geometry.bvh_size = m_Geometry.bvh.size();
+        m_Geometry.vertices_size = m_Geometry.vertices.size();
+        m_Geometry.normals_size = m_Geometry.normals.size();
+        m_Geometry.triangles_size = m_Geometry.triangles.size();
+        m_Geometry.emissives_size = m_Geometry.emissives.size();
+        m_Geometry.materials_size = m_Geometry.materials.size();
         m_BVH = BVH::Create(m_Geometry.triangles, m_Geometry.vertices);
         m_Backend.Reconstruct();
     }

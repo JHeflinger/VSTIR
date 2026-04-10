@@ -3,8 +3,17 @@
 #include "core/get.h"
 #include "util/log.h"
 #include <cstring>
+#include <random>
 
 namespace VSTIR {
+
+    uint32_t random_u32() {
+        static std::mt19937 rng(std::random_device{}());
+        static std::uniform_int_distribution<uint32_t> dist(
+            0, std::numeric_limits<uint32_t>::max()
+        );
+        return dist(rng);
+    }
 
     void VData::Initialize() {
         m_Descriptors = (VulkanDescriptors*)calloc(_shaders.size(), sizeof(VulkanDescriptors));
@@ -142,6 +151,14 @@ namespace VSTIR {
         ubo.triangles = _renderer.GetGeometry().triangles.size();
         ubo.width = _width;
         ubo.height = _height;
+        ubo.seed = random_u32();
+        ubo.fov = _renderer.GetCamera().fov;
+        ubo.position = _renderer.GetCamera().position;
+        ubo.look = glm::normalize(_renderer.GetCamera().look - ubo.position);
+        ubo.up = glm::normalize(_renderer.GetCamera().up);
+        ubo.w = -ubo.look;
+        ubo.u = glm::cross(ubo.up, ubo.w);
+        ubo.v = glm::cross(ubo.w, ubo.u);
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 

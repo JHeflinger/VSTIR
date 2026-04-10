@@ -107,6 +107,7 @@ namespace VSTIR {
         alignas(16) glm::vec3 v;
         alignas(16) glm::vec3 w;
         alignas(4) uint32_t triangles;
+        alignas(4) uint32_t seed;
         alignas(4) float fov;
         alignas(4) float width;
         alignas(4) float height;
@@ -168,6 +169,12 @@ namespace VSTIR {
         std::vector<Triangle> triangles;
         std::vector<uint32_t> emissives;
         std::vector<Material> materials;
+        size_t bvh_size;
+        size_t vertices_size;
+        size_t normals_size;
+        size_t triangles_size;
+        size_t emissives_size;
+        size_t materials_size;
     };
 
     struct VulkanGeometry {
@@ -207,6 +214,13 @@ namespace VSTIR {
         std::vector<std::string> mnames;
         std::vector<UseMaterialMarker> markers;
         std::string filepath;
+    };
+
+    struct Camera {
+        glm::vec3 position;
+        glm::vec3 look;
+        glm::vec3 up;
+    	float fov;
     };
 
 }

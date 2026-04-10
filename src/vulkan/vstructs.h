@@ -20,7 +20,6 @@ namespace VSTIR {
     } VulkanVariableType;
 
     struct CPUSwap {
-	    // TODO: rendertargets - RenderTexture2D target[CPUSWAP_LENGTH];
 	    size_t index;
         void* reference;
     };
@@ -119,6 +118,95 @@ namespace VSTIR {
         std::vector<VkImageView> views;
         VkFormat format;
         VkExtent2D extent;
+    };
+
+    struct Triangle {
+        alignas(4) uint32_t a;
+        alignas(4) uint32_t b;
+        alignas(4) uint32_t c;
+        alignas(4) uint32_t an;
+        alignas(4) uint32_t bn;
+        alignas(4) uint32_t cn;
+        alignas(4) uint32_t material;
+    };
+
+    struct Material {
+        alignas(16) glm::vec3 emission;
+        alignas(16) glm::vec3 ambient;
+        alignas(16) glm::vec3 diffuse;
+        alignas(16) glm::vec3 specular;
+        alignas(16) glm::vec3 absorbtion;
+        alignas(16) glm::vec3 dispersion;
+        alignas(4) float ior;
+        alignas(4) float shiny;
+        alignas(4) uint32_t model;
+    };
+
+    #define BVH_LEAF 0
+    #define BVH_LEFT_ONLY 1
+    #define BVH_RIGHT_ONLY 2
+    #define BVH_BOTH 3
+
+    struct NodeBVH {
+        alignas(16) glm::vec3 min;
+        alignas(16) glm::vec3 max;
+        alignas(4) uint32_t config;
+        alignas(4) uint32_t left;
+        alignas(4) uint32_t right;
+    };
+
+    struct AABB {
+        glm::vec3 min;
+        glm::vec3 max;
+        glm::vec3 centroid;
+    };
+
+    struct Geometry {
+        std::vector<NodeBVH> bvh;
+        std::vector<glm::vec4> vertices;
+        std::vector<glm::vec4> normals;
+        std::vector<Triangle> triangles;
+        std::vector<uint32_t> emissives;
+        std::vector<Material> materials;
+    };
+
+    struct VulkanGeometry {
+        VulkanDataBuffer bvh;
+        VulkanDataBuffer normals;
+        VulkanDataBuffer vertices;
+        VulkanDataBuffer triangles;
+        VulkanDataBuffer emissives;
+        VulkanDataBuffer materials;
+    };
+
+    struct Face {
+        uint32_t a;
+        uint32_t b;
+        uint32_t c;
+        uint32_t at;
+        uint32_t bt;
+        uint32_t ct;
+        uint32_t an;
+        uint32_t bn;
+        uint32_t cn;
+        bool textures;
+        bool normals;
+    };
+
+    struct UseMaterialMarker {
+        uint32_t faceIndex;
+        uint32_t materialIndex;
+    };
+
+    struct StateOBJ {
+        std::vector<glm::vec3> vertices;
+        std::vector<glm::vec3> normals;
+        std::vector<glm::vec2> uvs;
+        std::vector<Face> faces;
+        std::vector<Material> materials;
+        std::vector<std::string> mnames;
+        std::vector<UseMaterialMarker> markers;
+        std::string filepath;
     };
 
 }

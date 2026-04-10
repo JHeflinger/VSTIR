@@ -13,6 +13,7 @@ namespace VSTIR {
     public:
         static Editor* Get();
         static void Initialize(size_t width, size_t height);
+        static void LoadScene(std::string filepath);
         static void Run();
         static void Clean();
     public:

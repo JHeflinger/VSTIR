@@ -11,6 +11,7 @@ namespace VSTIR {
         ~VContext() {};
     public:
         void Initialize();
+        void Reconstruct();
         VulkanImage& Target() { return m_Target; }
         VData& Data() { return m_Data; }
         VulkanPipeline& Pipeline() { return m_Pipeline; }

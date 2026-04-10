@@ -10,7 +10,9 @@ namespace VSTIR {
         ~VData() { free(m_Descriptors); };
     public:
         void Initialize();
+        void Reconstruct();
         VulkanDescriptors* Descriptors() { return m_Descriptors; }
+        UBOArray& UBOs() { return m_UBOs; }
         void UpdateDescriptors();
         void UpdateUBOs();
     private:

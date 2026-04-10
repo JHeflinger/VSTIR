@@ -13,6 +13,10 @@ namespace VSTIR {
         InitializePipeline();
     }
 
+    void VContext::Reconstruct() {
+        m_Data.Reconstruct();
+    }
+
     void VContext::InitializePipeline() {
         size_t num_shaders = _shaders.size();
         m_Pipeline.pipeline = (VkPipeline*)calloc(num_shaders, sizeof(VkPipeline));

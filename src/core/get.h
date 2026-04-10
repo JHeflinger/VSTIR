@@ -15,3 +15,4 @@
 #define _scheduler (Editor::Get()->GetRenderer().GetBackend().Core().Scheduler())
 #define _data (Editor::Get()->GetRenderer().GetBackend().Core().Context().Data())
 #define _core (Editor::Get()->GetRenderer().GetBackend().Core())
+#define _renderer (Editor::Get()->GetRenderer())

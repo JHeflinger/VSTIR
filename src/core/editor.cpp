@@ -18,6 +18,10 @@ namespace VSTIR {
         s_Editor.m_Renderer.Initialize();
     }
 
+    void Editor::LoadScene(std::string filepath) {
+        s_Editor.m_Renderer.LoadScene(filepath);
+    }
+
     void Editor::Run() {
         while (!glfwWindowShouldClose(s_Editor.m_Window)) {
             glfwPollEvents();

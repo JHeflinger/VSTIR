@@ -13,6 +13,10 @@ namespace VSTIR {
         InitializeDescriptors();
     }
 
+    void VData::Reconstruct() {
+        UpdateDescriptors();
+    }
+
     void VData::InitializeSSBO() {
         uint32_t imgw = _width;
         uint32_t imgh = _height;
@@ -134,7 +138,11 @@ namespace VSTIR {
     }
 
     void VData::UpdateUBOs() {
-        // TODO:
+        UniformBufferObject ubo{};
+        ubo.triangles = _renderer.GetGeometry().triangles.size();
+        ubo.width = _width;
+        ubo.height = _height;
+        memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 
 }

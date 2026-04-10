@@ -35,6 +35,8 @@ namespace VSTIR {
             uint32_t mipLevels);
         static void CopyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
         static void RecordGeneralBarrier(VkCommandBuffer command);
+        static void DestroyBuffer(VulkanDataBuffer buffer);
+        static void CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer);
     };
 
 }

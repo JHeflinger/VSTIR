@@ -7,4 +7,8 @@ namespace VSTIR {
         m_Core.Initialize();
     }
 
+    void Backend::Reconstruct() {
+        m_Core.Reconstruct();
+    }
+
 }

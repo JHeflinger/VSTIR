@@ -33,7 +33,22 @@ namespace VSTIR {
     			},
     			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
     		};
-        }
+        } else if (strcmp(name, "UniformBufferObject") == 0) {
+    		return (VulkanBoundVariable) {
+    			UNIFORM_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_data.UBOs().object.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					false,
+    					(void*)1
+    				}, 0.0f,
+    				sizeof(UniformBufferObject)
+    			},
+    		};
+    	}
         WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
     	return (VulkanBoundVariable){};
     }

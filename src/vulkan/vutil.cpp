@@ -273,4 +273,24 @@ namespace VSTIR {
             0, 1, &memoryBarrier, 0, nullptr, 0, nullptr);
     }
 
+    void VUTILS::DestroyBuffer(VulkanDataBuffer buffer) {
+        vkDestroyBuffer(_interface, buffer.buffer, nullptr);
+        vkFreeMemory(_interface, buffer.memory, nullptr);
+    }
+
+    void VUTILS::CopyHostToBuffer(void* hostdata, size_t size, VkDeviceSize buffersize, VkBuffer buffer) {
+        VulkanDataBuffer stagingBuffer;
+        VUTILS::CreateBuffer(
+            buffersize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            &stagingBuffer);
+        void* data;
+        vkMapMemory(_interface, stagingBuffer.memory, 0, buffersize, 0, &data);
+        memcpy(data, hostdata, size);
+        vkUnmapMemory(_interface, stagingBuffer.memory);
+        VUTILS::CopyBuffer(stagingBuffer.buffer, buffer, buffersize);
+        VUTILS::DestroyBuffer(stagingBuffer);
+    }
+
 }

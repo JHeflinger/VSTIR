@@ -11,6 +11,7 @@ namespace VSTIR {
         ~Backend() {};
     public:
         void Initialize();
+        void Reconstruct();
         VMetadata& Metadata() { return m_Metadata; }
         VCore& Core() { return m_Core; }
     private:

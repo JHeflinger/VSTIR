@@ -10,6 +10,7 @@ namespace VSTIR {
         ~VScheduler() {};
     public:
         void Initialize();
+        void RecreateRenderFinishedSemaphores(uint32_t imageCount);
         VulkanCommands& Commands() { return m_Commands; }
         VkQueue& Queue() { return m_Queue; }
         VulkanSyncro& Syncro() { return m_Syncro; }

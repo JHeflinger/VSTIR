@@ -15,6 +15,7 @@ namespace VSTIR {
     public:
         void Initialize();
         void Render();
+        void Resize(uint32_t width, uint32_t height);
         void LoadScene(std::string filepath);
     public:
         Backend& GetBackend() { return m_Backend; }

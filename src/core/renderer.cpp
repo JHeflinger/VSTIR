@@ -1,12 +1,14 @@
 #include "renderer.h"
 #include "core/editor.h"
 #include "core/get.h"
+#include "core/ui.h"
 #include "util/log.h"
 #include "util/file.h"
 #include "util/bvh.h"
 #include "vulkan/vutil.h"
 #include <vulkan/vulkan.h>
 #include <cstring>
+#include <vector>
 
 #define INVOCATION_GROUP_SIZE 256
 #define MAX_MTLLIB_PATH_SIZE 1024
@@ -27,6 +29,8 @@
 }
 
 namespace VSTIR {
+
+    static std::vector<bool> s_SwapImageInitialized;
 
     typedef bool (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
     typedef bool (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
@@ -272,9 +276,7 @@ namespace VSTIR {
             ERROR("Invalid format for newmtl arguments, must have only 1 argument - detected %d instead", (int)numargs - 1);
             return false;
         }
-        char* name = (char*)calloc(strlen(lineargs[1]), sizeof(char));
-        strcpy(name, lineargs[1]);
-        state->mnames.push_back(std::string(name));
+        state->mnames.emplace_back(lineargs[1]);
         Material m{};
         state->materials.push_back(m);
         return true;
@@ -308,7 +310,7 @@ namespace VSTIR {
         char* fnstart = (char*)VFILE::StripFilename(mtlloc);
         if (fnstart) fnstart[0] = 0;
         else mtlloc[0] = 0;
-        sprintf(mtlpath, "%s%s", mtlloc, lineargs[1]);
+        snprintf(mtlpath, MAX_MTLLIB_PATH_SIZE, "%s%s", mtlloc, lineargs[1]);
         SimpleFile* file = VFILE::ReadFile(mtlpath);
         if (!file) {
             ERROR("Unable to load invalid filepath to mtllib \"%s\"", mtlpath);
@@ -559,6 +561,9 @@ namespace VSTIR {
 
     void Renderer::Initialize() {
         m_Backend.Initialize();
+        _scheduler.RecreateRenderFinishedSemaphores((uint32_t)_context.Swapchain().images.size());
+        s_SwapImageInitialized.assign(_context.Swapchain().images.size(), false);
+        UI::initialize(_window);
         m_Camera = (Camera){
             glm::vec3(0.0f, 2.133f, 2.11f),
             glm::vec3(0.0f, 0.0f, 0.0f),
@@ -567,10 +572,40 @@ namespace VSTIR {
     }
 
     void Renderer::Render() {
+        int fbWidth = 0, fbHeight = 0;
+        glfwGetFramebufferSize(_window, &fbWidth, &fbHeight);
+        if (fbWidth <= 0 || fbHeight <= 0) {
+            return;
+        }
+
+        // CPU/GPU frame pacing without queue idle every frame.
+        VkResult fenceWait = vkWaitForFences(_interface, 1, &_scheduler.Syncro().fence, VK_TRUE, UINT64_MAX);
+        if (fenceWait != VK_SUCCESS) {
+            FATAL("vkWaitForFences failed with VkResult=%d", (int)fenceWait);
+        }
+
+        const bool extentMismatch =
+            _context.Swapchain().extent.width != (uint32_t)fbWidth ||
+            _context.Swapchain().extent.height != (uint32_t)fbHeight;
+        if (extentMismatch) {
+            Resize((uint32_t)fbWidth, (uint32_t)fbHeight);
+            return;
+        }
+
         uint32_t imageIndex;
-        vkAcquireNextImageKHR(
+        VkResult acquireResult = vkAcquireNextImageKHR(
             _interface, _context.Swapchain().swapchain, UINT64_MAX,
             _scheduler.Syncro().imageAvailable, VK_NULL_HANDLE, &imageIndex);
+        if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR) {
+            Resize((uint32_t)fbWidth, (uint32_t)fbHeight);
+            return;
+        }
+        if (acquireResult == VK_SUBOPTIMAL_KHR) {
+            // Continue this frame so imageAvailable semaphore is consumed by submit.
+        } else if (acquireResult != VK_SUCCESS) {
+            FATAL("vkAcquireNextImageKHR failed with VkResult=%d", (int)acquireResult);
+        }
+        _swapchain.index = imageIndex;
 
         vkResetCommandBuffer(_scheduler.Commands().command, 0);
         _data.UpdateUBOs();
@@ -585,26 +620,53 @@ namespace VSTIR {
         submitInfo.commandBufferCount   = 1;
         submitInfo.pCommandBuffers      = &_scheduler.Commands().command;
         submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores    = &_scheduler.Syncro().renderFinished;
-        vkQueueSubmit(_scheduler.Queue(), 1, &submitInfo, VK_NULL_HANDLE);
+        VkSemaphore renderFinishedSemaphore = _scheduler.Syncro().renderFinished[imageIndex % _scheduler.Syncro().renderFinished.size()];
+        submitInfo.pSignalSemaphores    = &renderFinishedSemaphore;
+        VkResult fenceReset = vkResetFences(_interface, 1, &_scheduler.Syncro().fence);
+        if (fenceReset != VK_SUCCESS) {
+            FATAL("vkResetFences failed with VkResult=%d", (int)fenceReset);
+        }
+        VkResult submitResult = vkQueueSubmit(_scheduler.Queue(), 1, &submitInfo, _scheduler.Syncro().fence);
+        if (submitResult != VK_SUCCESS) {
+            FATAL("vkQueueSubmit failed with VkResult=%d", (int)submitResult);
+        }
 
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType              = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores    = &_scheduler.Syncro().renderFinished;
+        presentInfo.pWaitSemaphores    = &renderFinishedSemaphore;
         presentInfo.swapchainCount     = 1;
         presentInfo.pSwapchains        = &_context.Swapchain().swapchain;
         presentInfo.pImageIndices      = &imageIndex;
-        vkQueuePresentKHR(_scheduler.Queue(), &presentInfo);
-        vkQueueWaitIdle(_scheduler.Queue());
+        VkResult presentResult = vkQueuePresentKHR(_scheduler.Queue(), &presentInfo);
+        if (presentResult == VK_ERROR_OUT_OF_DATE_KHR) {
+            Resize((uint32_t)fbWidth, (uint32_t)fbHeight);
+            return;
+        }
+        if (presentResult == VK_SUBOPTIMAL_KHR) {
+            // Ignore persistent suboptimal states until extent actually changes.
+        } else if (presentResult != VK_SUCCESS) {
+            FATAL("vkQueuePresentKHR failed with VkResult=%d", (int)presentResult);
+        }
+    }
+
+    void Renderer::Resize(uint32_t width, uint32_t height) {
+        if (width == 0 || height == 0) {
+            return;
+        }
+        vkDeviceWaitIdle(_interface);
+        _context.ResizeSwapchain(width, height);
+        _scheduler.RecreateRenderFinishedSemaphores((uint32_t)_context.Swapchain().images.size());
+        s_SwapImageInitialized.assign(_context.Swapchain().images.size(), false);
+        UI::recreateSwapchainResources();
     }
 
     void Renderer::LoadScene(std::string filepath) {
         vkDeviceWaitIdle(_interface);
         SimpleFile* file = VFILE::ReadFile(filepath.c_str());
         uint32_t startv = m_Geometry.vertices.size();
-        if (!file) FATAL("Unable to load invalid filepath \"%s\"", filepath);
-        if (file->type != DOTOBJ) FATAL("\"%s\" is not a .obj file. Unable to open it with the OBJ loader", filepath);
+        if (!file) FATAL("Unable to load invalid filepath \"%s\"", filepath.c_str());
+        if (file->type != DOTOBJ) FATAL("\"%s\" is not a .obj file. Unable to open it with the OBJ loader", filepath.c_str());
         LineParser parser = VFILE::Parser(file);
         StateOBJ state{};
         state.filepath = std::string(filepath);
@@ -618,7 +680,7 @@ namespace VSTIR {
                 } else WARN("%s:%d - Unknown OBJ property detected: \"%s\", skipping parsing this field...", filepath.c_str(), (int)parser.line, lineargs[0]);
             }
         }
-        if (!ConstructOBJ(state)) FATAL("Unable to construct .obj \"%s\" due to an error", filepath);
+        if (!ConstructOBJ(state)) FATAL("Unable to construct .obj \"%s\" due to an error", filepath.c_str());
         VFILE::FreeFile(file);
         m_Geometry.bvh = BVH::Create(m_Geometry.triangles, m_Geometry.vertices);
         m_Geometry.bvh_size = m_Geometry.bvh.size();
@@ -696,11 +758,12 @@ namespace VSTIR {
         // Blit image
         {
             VkImage swapImg = _context.Swapchain().images[imageIndex];
+            const bool wasInitialized = imageIndex < s_SwapImageInitialized.size() && s_SwapImageInitialized[imageIndex];
             VkImageMemoryBarrier toTransferDst{};
             toTransferDst.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
             toTransferDst.srcAccessMask = 0;
             toTransferDst.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            toTransferDst.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            toTransferDst.oldLayout = wasInitialized ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_UNDEFINED;
             toTransferDst.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
             toTransferDst.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
             toTransferDst.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -709,13 +772,26 @@ namespace VSTIR {
             vkCmdPipelineBarrier(_scheduler.Commands().command,
                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
                 0, 0, nullptr, 0, nullptr, 1, &toTransferDst);
-            int winW, winH;
-            glfwGetFramebufferSize(_window, &winW, &winH);
-            float scaleX = (float)_width  / (float)winW;
-            float scaleY = (float)_height / (float)winH;
+
+            VkClearColorValue clearColor = { { 0.02f, 0.02f, 0.02f, 1.0f } };
+            VkImageSubresourceRange clearRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+            vkCmdClearColorImage(
+                _scheduler.Commands().command,
+                swapImg,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                &clearColor,
+                1,
+                &clearRange);
+
+            const int swapW = (int)_context.Swapchain().extent.width;
+            const int swapH = (int)_context.Swapchain().extent.height;
+            const int viewportW = (swapW * 2) / 3;
+            const int viewportH = swapH;
+            float scaleX = (float)_width  / (float)viewportW;
+            float scaleY = (float)_height / (float)viewportH;
             float scale  = (scaleX < scaleY) ? scaleX : scaleY;
-            float srcW = winW * scale;
-            float srcH = winH * scale;
+            float srcW = viewportW * scale;
+            float srcH = viewportH * scale;
             int32_t srcX0 = (int32_t)(((float)_width  - srcW) * 0.5f);
             int32_t srcY0 = (int32_t)(((float)_height - srcH) * 0.5f);
             int32_t srcX1 = srcX0 + (int32_t)srcW;
@@ -726,20 +802,19 @@ namespace VSTIR {
             blit.srcOffsets[1]  = { srcX1, srcY1, 1 };
             blit.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
             blit.dstOffsets[0]  = { 0, 0, 0 };
-            blit.dstOffsets[1]  = { (int32_t)_width, (int32_t)_height, 1 };
+            blit.dstOffsets[1]  = { viewportW, viewportH, 1 };
             vkCmdBlitImage(_scheduler.Commands().command,
                 _context.Target().image, VK_IMAGE_LAYOUT_GENERAL,
                 swapImg, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                 1, &blit, VK_FILTER_LINEAR);
-            VkImageMemoryBarrier toPresent = toTransferDst;
-            toPresent.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            toPresent.dstAccessMask = 0;
-            toPresent.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-            toPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-            vkCmdPipelineBarrier(_scheduler.Commands().command,
-                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                0, 0, nullptr, 0, nullptr, 1, &toPresent);
+
+            if (imageIndex < s_SwapImageInitialized.size()) {
+                s_SwapImageInitialized[imageIndex] = true;
+            }
         }
+
+        UI::setImageIndex(_swapchain.index);
+        UI::drawUI();
 
         // End command
         result = vkEndCommandBuffer(_scheduler.Commands().command);

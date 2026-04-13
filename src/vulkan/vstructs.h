@@ -52,7 +52,7 @@ namespace VSTIR {
     struct VulkanSyncro {
         VkFence fence;
         VkSemaphore imageAvailable;
-        VkSemaphore renderFinished;
+        std::vector<VkSemaphore> renderFinished;
     };
 
     struct VulkanCommands {

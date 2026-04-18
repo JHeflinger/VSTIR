@@ -24,7 +24,6 @@ namespace VSTIR {
         VulkanDescriptors* m_Descriptors;
         UBOArray m_UBOs;
         VulkanDataBuffer m_SSBO;
-        uint32_t m_Samples = 0;
     };
 
 }

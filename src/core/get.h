@@ -9,6 +9,9 @@
 #define _gpu (Editor::Get()->GetRenderer().GetBackend().Core().General().GPU())
 #define _width (Editor::Get()->Width())
 #define _height (Editor::Get()->Height())
+
+// #define _render_width
+// TODO Viewport dimensions, wire in
 #define _swapchain (Editor::Get()->GetRenderer().Swapchain())
 #define _context (Editor::Get()->GetRenderer().GetBackend().Core().Context())
 #define _shaders (Editor::Get()->GetRenderer().GetBackend().Core().Shaders())
@@ -16,3 +19,4 @@
 #define _data (Editor::Get()->GetRenderer().GetBackend().Core().Context().Data())
 #define _core (Editor::Get()->GetRenderer().GetBackend().Core())
 #define _renderer (Editor::Get()->GetRenderer())
+#define _render_settings (Editor::Get()->GetRenderer().GetSettings())

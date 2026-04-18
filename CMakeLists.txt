@@ -39,6 +39,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(glm)
 
+# ── Native File Dialog (cross-platform file dialogs) ───────────────────────────────────────
+FetchContent_Declare(
+        nfd
+        GIT_REPOSITORY https://github.com/btzy/nativefiledialog-extended.git
+        GIT_TAG        v1.3.0
+)
+FetchContent_MakeAvailable(nfd)
+
 # ── Dear ImGui ───────────────────────────────────────────────────────────────
 FetchContent_Declare(
     imgui
@@ -76,3 +84,6 @@ add_subdirectory(shaders)
 
 # ── Application ──────────────────────────────────────────────────────────────
 add_subdirectory(src)
+
+# Project Root Macro
+target_compile_definitions(${PROJECT_NAME} PRIVATE PROJECT_ROOT="${PROJECT_SOURCE_DIR}")

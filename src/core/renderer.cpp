@@ -564,16 +564,12 @@ namespace VSTIR {
         _scheduler.RecreateRenderFinishedSemaphores((uint32_t)_context.Swapchain().images.size());
         s_SwapImageInitialized.assign(_context.Swapchain().images.size(), false);
         UI::initialize(_window);
-        m_Camera = (Camera){
-            glm::vec3(0.0f, 2.133f, 2.11f),
-            glm::vec3(0.0f, 0.0f, 0.0f),
-            glm::vec3(0.0f, 1.0f, 0.0f),
-            90.0f};
+        m_Camera = Camera();
     }
 
     void Renderer::Render() {
         int fbWidth = 0, fbHeight = 0;
-        glfwGetFramebufferSize(_window, &fbWidth, &fbHeight);
+        glfwGetWindowSize(_window, &fbWidth, &fbHeight);
         if (fbWidth <= 0 || fbHeight <= 0) {
             return;
         }

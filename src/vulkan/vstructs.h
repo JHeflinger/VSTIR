@@ -216,11 +216,11 @@ namespace VSTIR {
         std::string filepath;
     };
 
-    struct Camera {
-        glm::vec3 position;
-        glm::vec3 look;
-        glm::vec3 up;
-    	float fov;
-    };
+    // struct Camera {
+    //     glm::vec3 position;
+    //     glm::vec3 look;
+    //     glm::vec3 up;
+    // 	float fov;
+    // };
 
 }

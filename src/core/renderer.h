@@ -4,9 +4,18 @@
 #include "vulkan/vstructs.h"
 #include <cstddef>
 
+#include "Camera.h"
+
 namespace VSTIR {
 
     class Editor;
+
+    struct RenderSettings {
+        bool accumulate_samples = false;
+        int32_t sample_count = 1;
+
+        float resolution_scale = 1.0f;
+    };
 
     class Renderer {
     public:
@@ -22,6 +31,8 @@ namespace VSTIR {
         CPUSwap& Swapchain() { return m_Swapchain; }
         Geometry& GetGeometry() { return m_Geometry; }
         Camera& GetCamera() { return m_Camera; }
+
+        RenderSettings& GetSettings() { return m_settings; }
     private:
         void RecordCommand(uint32_t imageIndex);
         bool ConstructOBJ(const StateOBJ state);
@@ -30,6 +41,7 @@ namespace VSTIR {
         Backend m_Backend;
         Geometry m_Geometry;
         Camera m_Camera;
+        RenderSettings m_settings;
     };
 
 }

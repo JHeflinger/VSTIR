@@ -4,18 +4,26 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <cmath>
 
+#include "get.h"
+#include "keybinds.h"
+#include "util/log.h"
+
 namespace VSTIR {
 
     static Editor s_Editor;
 
     static bool IsInViewport(GLFWwindow* window, double xpos, double ypos) {
+
         (void)ypos;
-        int fbWidth = 0, fbHeight = 0;
-        glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
-        if (fbWidth <= 0 || fbHeight <= 0) {
+        // Use window size (logical pixels / points) — the same coordinate space
+        // as glfwGetCursorPos. glfwGetFramebufferSize returns physical pixels on
+        // macOS Retina and would produce a 2x mismatch.
+        int winWidth = 0, winHeight = 0;
+        glfwGetWindowSize(window, &winWidth, &winHeight);
+        if (winWidth <= 0 || winHeight <= 0) {
             return false;
         }
-        const double viewportWidth = (double)fbWidth * (2.0 / 3.0);
+        const double viewportWidth = (double)winWidth * (2.0 / 3.0);
         return xpos >= 0.0 && xpos < viewportWidth;
     }
 
@@ -48,9 +56,14 @@ namespace VSTIR {
     }
 
     void Editor::Run() {
+        double lastTime = glfwGetTime();
+
         while (!glfwWindowShouldClose(s_Editor.m_Window)) {
             glfwPollEvents();
-            s_Editor.Update();
+            double currentTime = glfwGetTime();
+            auto deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            s_Editor.Update(deltaTime);
             s_Editor.m_Renderer.Render();
         }
     }
@@ -62,8 +75,14 @@ namespace VSTIR {
 
     void Editor::KeyCallback(GLFWwindow* window, int key, int, int action, int) {
         Editor* editor = static_cast<Editor*>(glfwGetWindowUserPointer(window));
-        if (!editor || action != GLFW_PRESS) {
-            return;
+        // if (!editor || action != GLFW_PRESS) {
+        //     return;
+        // }
+        if (action == GLFW_PRESS) {
+            editor->m_inputs.keys_held[key] = true;
+        }
+        else if (action == GLFW_RELEASE) {
+            editor->m_inputs.keys_held[key] = false;
         }
         if (key == GLFW_KEY_ESCAPE) {
             glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -71,7 +90,7 @@ namespace VSTIR {
     }
 
     void Editor::MouseButtonCallback(GLFWwindow* window, int button, int action, int) {
-        Editor* editor = static_cast<Editor*>(glfwGetWindowUserPointer(window));
+        auto* editor = static_cast<Editor*>(glfwGetWindowUserPointer(window));
         if (!editor) {
             return;
         }
@@ -79,9 +98,9 @@ namespace VSTIR {
         glfwGetCursorPos(window, &xpos, &ypos);
         const bool inViewport = IsInViewport(window, xpos, ypos);
         if (button == GLFW_MOUSE_BUTTON_LEFT) {
-            editor->m_LeftMouseDown = (action == GLFW_PRESS) && inViewport;
+            editor->m_inputs.left_mouse_down = (action == GLFW_PRESS) && inViewport;
         } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-            editor->m_RightMouseDown = (action == GLFW_PRESS) && inViewport;
+            editor->m_inputs.right_mouse_down = (action == GLFW_PRESS) && inViewport;
         }
     }
 
@@ -91,21 +110,20 @@ namespace VSTIR {
             return;
         }
 
-        if (!editor->m_MouseInitialized) {
-            editor->m_PrevMouseX = xpos;
-            editor->m_PrevMouseY = ypos;
-            editor->m_MouseInitialized = true;
+        if (!editor->m_inputs.mouse_initialized) {
+            editor->m_inputs.prev_mouse_position = {xpos, ypos};
+            editor->m_inputs.mouse_initialized = true;
             return;
         }
 
-        const double dx = xpos - editor->m_PrevMouseX;
-        const double dy = ypos - editor->m_PrevMouseY;
-        editor->m_PrevMouseX = xpos;
-        editor->m_PrevMouseY = ypos;
+
+        const double dx = xpos - editor->m_inputs.prev_mouse_position.x;
+        const double dy = ypos - editor->m_inputs.prev_mouse_position.y;
+        editor->m_inputs.prev_mouse_position = {xpos, ypos};
 
         if (!IsInViewport(window, xpos, ypos)) {
-            editor->m_LeftMouseDown = false;
-            editor->m_RightMouseDown = false;
+            editor->m_inputs.left_mouse_down = false;
+            editor->m_inputs.right_mouse_down = false;
             return;
         }
 
@@ -113,14 +131,14 @@ namespace VSTIR {
             return;
         }
 
-        if (editor->m_RightMouseDown) {
-            editor->HandleOrbit(dx, dy);
+        if (editor->m_inputs.left_mouse_down || editor->m_inputs.right_mouse_down) {
+            _renderer.GetCamera().handleMouse(dx, dy);
             editor->m_Reset = true;
         }
-        if (editor->m_LeftMouseDown) {
-            editor->HandlePan(dx, dy);
-            editor->m_Reset = true;
-        }
+        // if (editor->m_LeftMouseDown) {
+        //     editor->HandlePan(dx, dy);
+        //     editor->m_Reset = true;
+        // }
     }
 
     void Editor::ScrollCallback(GLFWwindow* window, double, double yoffset) {
@@ -142,53 +160,88 @@ namespace VSTIR {
             return;
         }
         // Let the render loop own swapchain recreation; callbacks can fire rapidly during drags.
-        UI::onResize((float)width, (float)height);
+        // Use logical window size (points) for UI layout — the framebuffer size passed here is
+        // in physical pixels and would produce incorrect panel dimensions on Retina displays.
+        int winW = 0, winH = 0;
+        glfwGetWindowSize(window, &winW, &winH);
+
+
+        if (winW > 0 && winH > 0) {
+            editor->m_Reset = true;
+            Get()->m_Width = winW;
+            Get()->m_Height = winH;
+            Get()->m_Renderer.Resize((uint32_t)width, (uint32_t)height);
+            UI::onResize((float)winW, (float)winH);
+        }
     }
 
-    void Editor::Update() {
+    void Editor::Update(double delta_time) {
+        UpdateCameraPosition(delta_time);
+
         // Reserved for per-frame editor updates that are not input callbacks.
     }
 
     void Editor::HandleOrbit(double dx, double dy) {
-        Camera& cam = m_Renderer.GetCamera();
-        const float sensitivity = 0.005f;
-        glm::vec3 toCamera = cam.position - cam.look;
-        float radius = glm::length(toCamera);
-        glm::mat4 yaw = glm::rotate(glm::mat4(1.0f), (float)-dx * sensitivity, glm::vec3(0, 1, 0));
-        toCamera = glm::vec3(yaw * glm::vec4(toCamera, 0.0f));
-        glm::vec3 right = glm::normalize(glm::cross(toCamera, glm::vec3(0, 1, 0)));
-        glm::mat4 pitch = glm::rotate(glm::mat4(1.0f), (float)dy * sensitivity, right);
-        glm::vec3 pitched = glm::vec3(pitch * glm::vec4(toCamera, 0.0f));
-        glm::vec3 pitchedNorm = glm::normalize(pitched);
-        if (std::abs(pitchedNorm.y) < 0.99f) {
-            toCamera = pitched;
-        }
-        cam.position = cam.look + glm::normalize(toCamera) * radius;
+
+        // const float sensitivity = 0.005f;
+        // glm::vec3 toCamera = cam.position - cam.look;
+        // float radius = glm::length(toCamera);
+        // glm::mat4 yaw = glm::rotate(glm::mat4(1.0f), (float)-dx * sensitivity, glm::vec3(0, 1, 0));
+        // toCamera = glm::vec3(yaw * glm::vec4(toCamera, 0.0f));
+        // glm::vec3 right = glm::normalize(glm::cross(toCamera, glm::vec3(0, 1, 0)));
+        // glm::mat4 pitch = glm::rotate(glm::mat4(1.0f), (float)dy * sensitivity, right);
+        // glm::vec3 pitched = glm::vec3(pitch * glm::vec4(toCamera, 0.0f));
+        // glm::vec3 pitchedNorm = glm::normalize(pitched);
+        // if (std::abs(pitchedNorm.y) < 0.99f) {
+        //     toCamera = pitched;
+        // }
+        // cam.position = cam.look + glm::normalize(toCamera) * radius;
+
     }
 
     void Editor::HandlePan(double dx, double dy) {
-        Camera& cam = m_Renderer.GetCamera();
-        const float sensitivity = 0.002f;
-        glm::vec3 forward = glm::normalize(cam.look - cam.position);
-        glm::vec3 right   = glm::normalize(glm::cross(forward, cam.up));
-        glm::vec3 up      = glm::normalize(glm::cross(right, forward));
-        float dist        = glm::length(cam.look - cam.position);
-        glm::vec3 pan = (-right * (float)dx + up * (float)dy) * sensitivity * dist;
-        cam.position += pan;
-        cam.look += pan;
+        // Camera& cam = m_Renderer.GetCamera();
+        // const float sensitivity = 0.002f;
+        // glm::vec3 forward = glm::normalize(cam.look - cam.position);
+        // glm::vec3 right   = glm::normalize(glm::cross(forward, cam.up));
+        // glm::vec3 up      = glm::normalize(glm::cross(right, forward));
+        // float dist        = glm::length(cam.look - cam.position);
+        // glm::vec3 pan = (-right * (float)dx + up * (float)dy) * sensitivity * dist;
+        // cam.position += pan;
+        // cam.look += pan;
     }
 
     void Editor::HandleZoom(double yoffset) {
-        if (yoffset == 0.0) {
-            return;
-        }
-        Camera& cam = m_Renderer.GetCamera();
-        const float sensitivity = 0.1f;
-        glm::vec3 toCamera = cam.position - cam.look;
-        float radius = glm::length(toCamera);
-        radius = std::max(0.1f, radius - (float)yoffset * sensitivity * radius);
-        cam.position = cam.look + glm::normalize(toCamera) * radius;
+        auto& cam = m_Renderer.GetCamera();
+        cam.handleZoom(yoffset);
         m_Reset = true;
     }
 
+    void Editor::UpdateCameraPosition(double delta_time) {
+        auto& cam = m_Renderer.GetCamera();
+
+        if (!cam.IsOrbiting()) {
+            glm::vec3 xz_direction = {0,0,0};
+            glm::vec3 y_direction = {0,0,0};
+            if (m_inputs.keys_held[Keybinds::MoveForward]) {
+                xz_direction += cam.getLookXZ();
+            }
+            if (m_inputs.keys_held[Keybinds::MoveBackward]) {
+                xz_direction -= cam.getLookXZ();
+            }
+            if (m_inputs.keys_held[Keybinds::MoveRight]) { // right
+                xz_direction += glm::cross(cam.getLookXZ(), cam.getUp());
+            }
+            if (m_inputs.keys_held[Keybinds::MoveLeft]) {
+                xz_direction -= glm::cross(cam.getLookXZ(), cam.getUp());
+            }
+            if (m_inputs.keys_held[Keybinds::MoveUp]) {
+                y_direction += cam.getUp();
+            }
+            if (m_inputs.keys_held[Keybinds::MoveDown]) {
+                y_direction -= cam.getUp();
+            }
+            cam.Position() += (xz_direction + y_direction) * cam.MovementSpeed() * float(delta_time);
+        }
+    }
 }

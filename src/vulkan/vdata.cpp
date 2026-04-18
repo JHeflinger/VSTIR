@@ -147,20 +147,31 @@ namespace VSTIR {
 
     void VData::UpdateUBOs() {
         UniformBufferObject ubo{};
+        auto& render_settings = _renderer.GetSettings();
         ubo.triangles = _renderer.GetGeometry().triangles.size();
+        ubo.seed = random_u32();
+
+        //
         ubo.width = _width;
         ubo.height = _height;
-        ubo.seed = random_u32();
-        if (Editor::Get()->Reset()) m_Samples = 0; 
-        ubo.samples = m_Samples;
-        m_Samples++;
-        ubo.fov = _renderer.GetCamera().fov;
-        ubo.position = _renderer.GetCamera().position;
-        ubo.look = glm::normalize(_renderer.GetCamera().look - ubo.position);
-        ubo.up = glm::normalize(_renderer.GetCamera().up);
+
+
+        // Samples
+        if (Editor::Get()->Reset() || !render_settings.accumulate_samples) render_settings.sample_count = 0;
+        ubo.samples = render_settings.sample_count;
+        if (render_settings.accumulate_samples) render_settings.sample_count++;
+
+
+        // Camera
+        ubo.fov = glm::radians(_renderer.GetCamera().Fov());
+        ubo.position = _renderer.GetCamera().Position();
+        ubo.look = _renderer.GetCamera().getLook();
+        ubo.up = _renderer.GetCamera().getUp();
         ubo.w = -ubo.look;
         ubo.u = glm::normalize(glm::cross(ubo.up, ubo.w));
         ubo.v = glm::normalize(glm::cross(ubo.w, ubo.u));
+
+
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 

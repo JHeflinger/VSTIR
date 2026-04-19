@@ -1,30 +1,30 @@
-#include "Camera.h"
+#include "camera.h"
 
 #include <algorithm>
 
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace VSTIR {
-    void Camera::setLook(const glm::vec3 look) {
+    void camera::setLook(const glm::vec3 look) {
         m_look = glm::normalize(look);
     }
 
-    void Camera::setUp(const glm::vec3 up) {
+    void camera::setUp(const glm::vec3 up) {
         m_up = glm::normalize(up);
     }
 
-    glm::vec3 Camera::getLook() {
+    glm::vec3 camera::getLook() {
         if (m_orbiting) {
             m_look = glm::normalize(m_orbit_target - m_position);
         }
         return m_look;
     }
 
-    glm::vec3 Camera::getUp() {
+    glm::vec3 camera::getUp() {
         return m_up;
     }
 
-    void Camera::Reset() {
+    void camera::Reset() {
         m_position = {0.0f, 2.133f, 2.11f};
         m_look = {0,0, 1};
         m_up = {0,1,0};
@@ -34,7 +34,7 @@ namespace VSTIR {
     }
 
 
-    void Camera::handleMouse(double dx, double dy) {
+    void camera::handleMouse(double dx, double dy) {
         if (m_orbiting) {
             handleOrbit(dx, dy);
         } else {
@@ -42,7 +42,7 @@ namespace VSTIR {
         }
     }
 
-    void Camera::handleOrbit(double dx, double dy) {
+    void camera::handleOrbit(double dx, double dy) {
         glm::vec3 toCamera = m_position - m_orbit_target;
         float radius = glm::length(toCamera);
         glm::mat4 yaw = glm::rotate(glm::mat4(1.0f), (float)-dx * m_look_sensitivity * LOOK_SENSITIVITY_FACTOR, glm::vec3(0, 1, 0));
@@ -58,7 +58,7 @@ namespace VSTIR {
         m_look = -glm::normalize(toCamera);
     }
 
-    void Camera::handleZoom(double yoffset) {
+    void camera::handleZoom(double yoffset) {
         if (!m_orbiting) return;
         if (yoffset == 0.0) return;
 
@@ -68,7 +68,7 @@ namespace VSTIR {
         m_position = m_orbit_target + glm::normalize(toCamera) * radius;
     }
 
-    void Camera::handleFreeLook(double dx, double dy) {
+    void camera::handleFreeLook(double dx, double dy) {
         // Yaw: rotate m_look around the world up axis
         glm::mat4 yaw = glm::rotate(glm::mat4(1.0f), (float)-dx * m_look_sensitivity * LOOK_SENSITIVITY_FACTOR, glm::vec3(0, 1, 0));
         m_look = glm::normalize(glm::vec3(yaw * glm::vec4(m_look, 0.0f)));

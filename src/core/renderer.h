@@ -15,6 +15,10 @@ namespace VSTIR {
         int32_t sample_count = 1;
 
         float resolution_scale = 1.0f;
+        uint32_t _last_render_width  = 0; // internal: used to detect render-size changes
+        uint32_t _last_render_height = 0;
+
+        bool denoiser = false; // TODO implement
     };
 
     class Renderer {

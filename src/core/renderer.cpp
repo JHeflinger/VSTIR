@@ -32,6 +32,10 @@ namespace VSTIR {
 
     static std::vector<bool> s_SwapImageInitialized;
 
+    static uint32_t WorkgroupCount1D(uint32_t count, uint32_t localSize) {
+        return (count + localSize - 1u) / localSize;
+    }
+
     typedef bool (*ParseFuncOBJ)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
     typedef bool (*ParseFuncMTL)(char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE], size_t, StateOBJ*);
 
@@ -563,6 +567,8 @@ namespace VSTIR {
         m_Backend.Initialize();
         _scheduler.RecreateRenderFinishedSemaphores((uint32_t)_context.Swapchain().images.size());
         s_SwapImageInitialized.assign(_context.Swapchain().images.size(), false);
+        _render_settings._last_render_width = _render_width;
+        _render_settings._last_render_height = _render_height;
         UI::initialize(_window);
         m_Camera = Camera();
     }
@@ -583,7 +589,10 @@ namespace VSTIR {
         const bool extentMismatch =
             _context.Swapchain().extent.width != (uint32_t)fbWidth ||
             _context.Swapchain().extent.height != (uint32_t)fbHeight;
-        if (extentMismatch) {
+        const bool scaleMismatch =
+            _render_width != _render_settings._last_render_width ||
+            _render_height != _render_settings._last_render_height;
+        if (extentMismatch || scaleMismatch) {
             Resize((uint32_t)fbWidth, (uint32_t)fbHeight);
             return;
         }
@@ -650,11 +659,40 @@ namespace VSTIR {
         if (width == 0 || height == 0) {
             return;
         }
+
+        const bool extentMismatch =
+            _context.Swapchain().extent.width != width ||
+            _context.Swapchain().extent.height != height;
+        const bool scaleMismatch =
+            _render_width != _render_settings._last_render_width ||
+            _render_height != _render_settings._last_render_height;
+
+        if (!extentMismatch && !scaleMismatch) {
+            return;
+        }
+
         vkDeviceWaitIdle(_interface);
-        _context.ResizeSwapchain(width, height);
-        _scheduler.RecreateRenderFinishedSemaphores((uint32_t)_context.Swapchain().images.size());
-        s_SwapImageInitialized.assign(_context.Swapchain().images.size(), false);
-        UI::recreateSwapchainResources();
+
+        if (extentMismatch) {
+            _context.ResizeSwapchain(width, height);
+            _scheduler.RecreateRenderFinishedSemaphores((uint32_t)_context.Swapchain().images.size());
+            s_SwapImageInitialized.assign(_context.Swapchain().images.size(), false);
+            UI::recreateSwapchainResources();
+        }
+
+        if (scaleMismatch) {
+            _context.ResizeTarget();
+            _core.RecreateBridge();
+            _data.RecreateSSBO();
+            _render_settings.sample_count = 0;
+        }
+
+        if (scaleMismatch) {
+            _data.UpdateDescriptors();
+        }
+
+        _render_settings._last_render_width  = _render_width;
+        _render_settings._last_render_height = _render_height;
     }
 
     void Renderer::LoadScene(std::string filepath) {
@@ -696,7 +734,7 @@ namespace VSTIR {
 
         // execute shader stages
         for (size_t i = 0; i < _shaders.size(); i++) {
-            uint32_t invocations = _width * _height;
+            uint32_t invocations = _render_width * _render_height;
             vkCmdBindPipeline(
                 _scheduler.Commands().command,
                 VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -710,7 +748,7 @@ namespace VSTIR {
                 &(_data.Descriptors()[i].set),
                 0,
                 nullptr);
-            vkCmdDispatch(_scheduler.Commands().command, ceil((invocations) / ((float)INVOCATION_GROUP_SIZE)), 1, 1);
+            vkCmdDispatch(_scheduler.Commands().command, WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE), 1, 1);
             VUTILS::RecordGeneralBarrier(_scheduler.Commands().command);
         }
 
@@ -744,7 +782,7 @@ namespace VSTIR {
             region.imageSubresource.baseArrayLayer = 0;
             region.imageSubresource.layerCount = 1;
             region.imageOffset = (VkOffset3D){ 0, 0, 0 };
-            region.imageExtent = (VkExtent3D){ (uint32_t)_width, (uint32_t)_height, 1 };
+            region.imageExtent = (VkExtent3D){ _render_width, _render_height, 1 };
             vkCmdCopyImageToBuffer(
                 _scheduler.Commands().command,
                 _context.Target().image,
@@ -781,15 +819,15 @@ namespace VSTIR {
 
             const int swapW = (int)_context.Swapchain().extent.width;
             const int swapH = (int)_context.Swapchain().extent.height;
-            const int viewportW = (swapW * 2) / 3;
-            const int viewportH = swapH;
-            float scaleX = (float)_width  / (float)viewportW;
-            float scaleY = (float)_height / (float)viewportH;
+            const int viewportW = (int)(_viewport_width > (size_t)swapW ? (size_t)swapW : _viewport_width);
+            const int viewportH = (int)(_viewport_height > (size_t)swapH ? (size_t)swapH : _viewport_height);
+            float scaleX = (float)_render_width  / (float)viewportW;
+            float scaleY = (float)_render_height / (float)viewportH;
             float scale  = (scaleX < scaleY) ? scaleX : scaleY;
             float srcW = viewportW * scale;
             float srcH = viewportH * scale;
-            int32_t srcX0 = (int32_t)(((float)_width  - srcW) * 0.5f);
-            int32_t srcY0 = (int32_t)(((float)_height - srcH) * 0.5f);
+            int32_t srcX0 = (int32_t)(((float)_render_width  - srcW) * 0.5f);
+            int32_t srcY0 = (int32_t)(((float)_render_height - srcH) * 0.5f);
             int32_t srcX1 = srcX0 + (int32_t)srcW;
             int32_t srcY1 = srcY0 + (int32_t)srcH;
             VkImageBlit blit{};

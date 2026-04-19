@@ -15,7 +15,7 @@
 #define _viewport_height (Editor::Get()->ViewportHeight())
 
 #define _camera (Editor::Get()->GetRenderer().GetCamera())
-
+#define _update_render (Editor::Get()->UpdateRender())
 #define _render_width  ((uint32_t)std::max<size_t>(1, (size_t)(_viewport_width  * _render_settings.resolution_scale)))
 #define _render_height ((uint32_t)std::max<size_t>(1, (size_t)(_viewport_height * _render_settings.resolution_scale)))
 #define _swapchain (Editor::Get()->GetRenderer().Swapchain())

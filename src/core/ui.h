@@ -2,6 +2,7 @@
 #include "GLFW/glfw3.h"
 #include <cstdint>
 #include <vector>
+#include <string>
 
 namespace VSTIR {
     struct FileFilters {

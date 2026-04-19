@@ -23,11 +23,11 @@ namespace VSTIR {
         static void endDraw();
         static std::string openFileExplorer(std::vector<FileFilters> filters);
     private:
+        static void sectionControls();
         static void sectionScene();
-        static void sectionPerformance(int viewportWidthPx, int viewportHeightPx);
+        static void sectionPerformance();
         static void sectionCamera();
         static void sectionRenderSettings();
-        static void sectionEnvironment();
         static void sectionPostProcessing();
         static void sectionObjects();
         static void openFileButton();

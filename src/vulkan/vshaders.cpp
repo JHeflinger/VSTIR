@@ -132,8 +132,8 @@ namespace VSTIR {
 			},
 			(SchrodingSize) {
 				(SchrodingRef) {
-					false,
-					(void*)(_render_height * _render_width)
+					true,
+					&(_renderer.GetGeometry().raygen_size)
 				}, 0.0f,
 				sizeof(RayGenerator)
 			}

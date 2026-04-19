@@ -41,48 +41,6 @@ std::array<float, 180> s_FrameTimesMs{};
 int                    s_FrameTimeCursor = 0;
 int                    s_FrameSamples    = 0;
 
-// ----- Camera interaction state -----
-
-float s_OrbitSensitivity = 1.0f;
-float s_PanSensitivity   = 1.0f;
-float s_ZoomSensitivity  = 1.0f;
-
-// ----- Environment / lighting state -----
-
-int   s_SkyMode            = 0;  // 0=Solid  1=Gradient  2=HDRI
-float s_SkyColor[3]        = { 0.05f, 0.07f, 0.15f };
-float s_SkyHorizonColor[3] = { 0.20f, 0.12f, 0.06f };
-bool  s_EnableSun          = true;
-float s_SunAzimuth         = 45.0f;
-float s_SunElevation       = 60.0f;
-float s_SunColor[3]        = { 1.00f, 0.95f, 0.85f };
-float s_SunIntensity       = 5.0f;
-float s_AmbientIntensity   = 0.02f;
-
-// ----- Post-processing state -----
-
-float s_Exposure         = 1.0f;
-float s_Gamma            = 2.2f;
-int   s_ToneMap          = 1;  // 0=None  1=ACES  2=Reinhard  3=Filmic
-bool  s_Vignette         = false;
-float s_VignetteStrength = 0.3f;
-bool  s_Bloom            = false;
-float s_BloomThreshold   = 1.0f;
-float s_BloomStrength    = 0.05f;
-bool  s_Denoiser         = false;
-
-// ----- Material / object state -----
-
-int   s_SelectedMaterial     = 0;
-float s_MatAlbedo[3]         = { 0.80f, 0.20f, 0.20f };
-float s_MatMetallic          = 0.0f;
-float s_MatRoughness         = 0.5f;
-float s_MatIOR               = 1.5f;
-float s_MatEmission[3]       = { 0.0f, 0.0f, 0.0f };
-float s_MatEmissionIntensity = 0.0f;
-bool  s_MatTransmission      = false;
-float s_MatTransmitDepth     = 1.0f;
-
 // ============================================================
 // Vulkan helpers
 // ============================================================
@@ -345,8 +303,10 @@ namespace VSTIR {
 
     void UI::onResize(float width, float height) {
         if (width <= 0.0f || height <= 0.0f) return;
-        s_WindowWidth  = std::max(220.0f, width / 3.0f);
-        s_WindowHeight = std::max(220.0f, height);
+        const float viewportW = (float)_viewport_width;
+        const float viewportH = (float)_viewport_height;
+        s_WindowWidth  = std::max(220.0f, width - viewportW);
+        s_WindowHeight = std::max(220.0f, viewportH);
         s_ForceLayout  = true;
     }
 
@@ -359,7 +319,7 @@ namespace VSTIR {
         glfwGetWindowSize(VSTIR::Editor::Get()->Window(), &winW, &winH);
         const float totalW    = winW > 0 ? (float)winW : (float)_context.Swapchain().extent.width;
         const float totalH    = winH > 0 ? (float)winH : (float)_context.Swapchain().extent.height;
-        const float viewportW = totalW * (2.0f / 3.0f);
+        const float viewportW = (float)_viewport_width;
         const float panelW    = totalW - viewportW;
 
         beginDraw(viewportW, 0.0f, panelW, totalH);
@@ -385,11 +345,12 @@ namespace VSTIR {
         ImGui::Separator();
         ImGui::Spacing();
 
+        sectionControls();
         sectionScene();
-        sectionPerformance((int)viewportW, (int)totalH);
+        sectionPerformance();
         sectionCamera();
         sectionRenderSettings();
-        sectionEnvironment();
+
         sectionPostProcessing();
         sectionObjects();
 
@@ -479,12 +440,33 @@ namespace VSTIR {
         return changed;
     }
 
+    void UI::sectionControls() {
+        if (!ImGui::CollapsingHeader("  Controls"))
+            return;
+
+        ImGui::Text("  Camera mode:");
+        ImGui::SameLine(110.f);
+        ImGui::TextColored(ImVec4(0.82f, 0.48f, 0.48f, 1.0f), "%s", _camera.IsOrbiting() ? "Orbit" : "Free");
+        if (_camera.IsOrbiting()) {
+            ImGui::Text("  [Mouse + Drag] Rotate camera around the target point");
+            ImGui::Text("  [Mouse Wheel] Zoom in/out");
+        } else {
+            ImGui::Text("  [Mouse + Drag] Look around");
+            ImGui::Text("  [WASD] Move Forward/Left/Back/Right");
+            ImGui::Text("  [Space] Go Up");
+            ImGui::Text("  [Shift] Go Down");
+        }
+        ImGui::Text("  Change camera settings under \"Camera\" section below");
+
+
+    }
+
     // ============================================================
     // sectionScene
     // ============================================================
 
     void UI::sectionScene() {
-        if (!ImGui::CollapsingHeader("  Scene", ImGuiTreeNodeFlags_DefaultOpen))
+        if (!ImGui::CollapsingHeader("  Scene"))
             return;
 
         openFileButton();
@@ -512,7 +494,7 @@ namespace VSTIR {
     // sectionPerformance
     // ============================================================
 
-    void UI::sectionPerformance(int viewportWidthPx, int viewportHeightPx) {
+    void UI::sectionPerformance() {
         if (!ImGui::CollapsingHeader("  Performance", ImGuiTreeNodeFlags_DefaultOpen))
             return;
 
@@ -543,11 +525,10 @@ namespace VSTIR {
         ImGui::Text("%.1f", fps);
         ImGui::PopStyleColor();
 
+        // ImGui::SameLine();
         LabelValue("  Frame Time :", "%.2f ms", frameMs);
-        LabelValue("  Avg (180f) :", "%.2f ms", avgMs);
-        LabelValue("  Viewport   :", "%d x %d", viewportWidthPx, viewportHeightPx);
-        LabelValue("  Render Res :", "%zu x %zu",
-            (_width), _height);
+        // LabelValue("  Avg (180f) :", "%.2f ms", avgMs);
+
 
         ImGui::Spacing();
 
@@ -556,10 +537,17 @@ namespace VSTIR {
         const float graphMaxMs = std::max(33.0f, maxMs * 1.2f);
         const float budgetMs   = 1000.0f / 60.0f;
 
+        constexpr float kPlotHeight = 80.0f;
+        constexpr float kAxisLabelGutterWidth = 56.0f;
+        constexpr float kAxisLabelPad = 4.0f;
+
+        const ImVec2 labelMin = ImGui::GetCursorScreenPos();
+        ImGui::Dummy(ImVec2(kAxisLabelGutterWidth, kPlotHeight));
+        ImGui::SameLine(0.0f, 6.0f);
         ImGui::PlotLines(
             "##frametimes",
             s_FrameTimesMs.data(), s_FrameSamples, s_FrameTimeCursor,
-            nullptr, graphMinMs, graphMaxMs, ImVec2(-1.0f, 80.0f));
+            nullptr, graphMinMs, graphMaxMs, ImVec2(-1.0f, kPlotHeight));
 
         // 60-fps budget reference line
         ImDrawList*  dl      = ImGui::GetWindowDrawList();
@@ -568,15 +556,33 @@ namespace VSTIR {
         const float  t       = (budgetMs - graphMinMs) / std::max(0.001f, graphMaxMs - graphMinMs);
         const float  budgetY = plotMax.y - t * (plotMax.y - plotMin.y);
         dl->AddLine(ImVec2(plotMin.x, budgetY), ImVec2(plotMax.x, budgetY),
-                    IM_COL32(255, 80, 80, 220), 1.5f);
+                    IM_COL32(255, 255, 255, 100), 1.5f);
         char budgetLabel[64];
         snprintf(budgetLabel, sizeof(budgetLabel), "60fps (%.1fms)", budgetMs);
         dl->AddText(ImVec2(plotMin.x + 4.0f, budgetY - 14.0f),
                     IM_COL32(255, 110, 110, 255), budgetLabel);
 
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.48f, 0.28f, 0.28f, 1.0f));
-        ImGui::Text("oldest -> newest  |  top: %.1fms  bot: %.1fms", graphMaxMs, graphMinMs);
-        ImGui::PopStyleColor();
+        char topLabel[32];
+        char botLabel[32];
+        snprintf(topLabel, sizeof(topLabel), "%.1f ms", graphMaxMs);
+        snprintf(botLabel, sizeof(botLabel), "%.1f ms", graphMinMs);
+        const float topLabelWidth = ImGui::CalcTextSize(topLabel).x;
+        const float botLabelWidth = ImGui::CalcTextSize(botLabel).x;
+        dl->AddText(
+            ImVec2(labelMin.x + kAxisLabelGutterWidth - topLabelWidth - kAxisLabelPad, plotMin.y + 2.0f),
+            IM_COL32(210, 150, 150, 255),
+            topLabel);
+        dl->AddText(
+            ImVec2(labelMin.x + kAxisLabelGutterWidth - botLabelWidth - kAxisLabelPad, plotMax.y - 16.0f),
+            IM_COL32(210, 150, 150, 255),
+            botLabel);
+
+        const char* dirLabel = "oldest -> newest";
+        const float dirWidth = ImGui::CalcTextSize(dirLabel).x;
+        dl->AddText(
+            ImVec2(plotMax.x - dirWidth - 6.0f, plotMax.y - 16.0f),
+            IM_COL32(170, 120, 120, 255),
+            dirLabel);
 
         ImGui::Spacing();
     }
@@ -589,51 +595,50 @@ namespace VSTIR {
         if (!ImGui::CollapsingHeader("  Camera", ImGuiTreeNodeFlags_DefaultOpen))
             return;
 
-        Camera& cam = VSTIR::Editor::Get()->GetRenderer().GetCamera();
+        constexpr int bar_start = 150;
 
-        SubHeading("Live State");
+        Camera& cam = _camera;
+
+        // SubHeading("Live State");
 
         ImGui::Text("  Mode      :");
-        ImGui::SameLine(110.0f);
+        ImGui::SameLine(bar_start);
         SegmentedToggle("Orbit", "Free Look", &cam.IsOrbiting());
+
+        ImGui::Spacing();
 
         if (cam.IsOrbiting()) {
             ImGui::Text("  Target Pos:");
-            ImGui::SameLine(110.0f);
+            ImGui::SameLine(bar_start);
             ImGui::DragFloat3("##Target Pos:", &cam.OrbitTarget()[0]);
+        } else {
+            ImGui::Text("  Position:");
+            ImGui::SameLine(bar_start);
+            ImGui::DragFloat3("##Pos:", &cam.Position()[0]);
+
         }
 
-        ImGui::Text("  Position  :");
-        ImGui::SameLine(110.0f);
-        ImGui::TextColored(ImVec4(0.82f, 0.48f, 0.48f, 1.0f),
-        "%.2f  %.2f  %.2f", cam.Position().x, cam.Position().y, cam.Position().z);
+        ImGui::Text("  Look Sensitivity:");
+        ImGui::SameLine(bar_start);
+        ImGui::SliderFloat("##look sens", &cam.LookSensitivity(), 0.1f, 5.0f);
 
-        // ImGui::Text("  Look   :");
-        // ImGui::SameLine(110.0f);
-        // ImGui::TextColored(ImVec4(0.82f, 0.48f, 0.48f, 1.0f),
-        //     "%.2f  %.2f  %.2f", cam.look.x, cam.look.y, cam.look.z);
+        if (cam.IsOrbiting()) {
+            ImGui::Text("  Zoom sensitivity:");
+            ImGui::SameLine(bar_start);
+            ImGui::SliderFloat("##zoom sens", &cam.ZoomSensitivity(), 0.1f, 5.0f);
+        } else {
+            ImGui::Text("  Movement Speed:");
+            ImGui::SameLine(bar_start);
+            ImGui::SliderFloat("##move speed", &cam.MovementSpeed(), 0.1f, 20.0f);
+        }
 
-        // ImGui::SliderFloat("##FOV", &cam.Fov(), 30.0f, 140.0f, "%.1f deg");
-
-        LabelSliderFloat("##fov", "  FOV:", &cam.Fov(), 30.0f, 140.0f, "%.1f deg");
-
-
-
-        ImGui::Spacing();
-        SubHeading("Mouse Controls");
-
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.55f, 0.38f, 0.38f, 1.0f));
-        ImGui::TextWrapped("LMB: Pan    RMB: Orbit    Scroll: Zoom");
-        ImGui::PopStyleColor();
-        ImGui::Spacing();
-
-        LabelSliderFloat("##orbit_s", "  Orbit Sens:", &s_OrbitSensitivity, 0.1f, 5.0f);
-        LabelSliderFloat("##pan_s",   "  Pan Sens  :", &s_PanSensitivity,   0.1f, 5.0f);
-        LabelSliderFloat("##zoom_s",  "  Zoom Sens :", &s_ZoomSensitivity,  0.1f, 5.0f);
+        ImGui::Text("  FOV: ");
+        ImGui::SameLine(150.0f);
+        ImGui::SliderFloat("##fov", &cam.Fov(), 30.0f, 140.0f, "%.1f deg");
 
         ImGui::Spacing();
         if (ImGui::Button("Reset Camera", ImVec2(-1.0f, 0.0f))) {
-            // TODO: Reset camera to default position
+            cam.Reset();
         }
         ImGui::Spacing();
     }
@@ -641,7 +646,6 @@ namespace VSTIR {
     // ============================================================
     // sectionRenderSettings
     // ============================================================
-
     void UI::sectionRenderSettings() {
         if (!ImGui::CollapsingHeader("  Render Settings", ImGuiTreeNodeFlags_DefaultOpen))
             return;
@@ -657,6 +661,17 @@ namespace VSTIR {
         // ImGui::PushItemWidth(-1.0f);
         // ImGui::Combo("##rendermode", &s_RenderMode, kRenderModes, 5);
         // ImGui::PopItemWidth();
+
+
+
+        ImGui::Text("  Render Resolution:");
+        ImGui::SameLine();
+        ImGui::Text("%d x %d", _render_width, _render_height);
+        ImGui::Spacing();
+        ImGui::Text("  Resolution Scale:");
+        ImGui::SameLine();
+
+        ImGui::SliderFloat("##resscale", &render_settings.resolution_scale, 0.1f, 2.0f, "%.2fx");
 
         ImGui::Spacing();
 
@@ -684,69 +699,6 @@ namespace VSTIR {
     }
 
     // ============================================================
-    // sectionEnvironment
-    // ============================================================
-
-    void UI::sectionEnvironment() {
-        if (!ImGui::CollapsingHeader("  Environment"))
-            return;
-
-        static const char* kSkyModes[] = { "Solid Color", "Gradient", "HDRI" };
-
-        ImGui::Text("  Sky Mode   :");
-        ImGui::SameLine(110.0f);
-        ImGui::PushItemWidth(-1.0f);
-        ImGui::Combo("##skymode", &s_SkyMode, kSkyModes, 3);
-        ImGui::PopItemWidth();
-        ImGui::Spacing();
-
-        if (s_SkyMode == 0) {
-            ImGui::Text("  Sky Color  :");
-            ImGui::SameLine(110.0f);
-            ImGui::PushItemWidth(-1.0f);
-            ImGui::ColorEdit3("##skycolor", s_SkyColor);
-            ImGui::PopItemWidth();
-        } else if (s_SkyMode == 1) {
-            ImGui::Text("  Zenith     :");
-            ImGui::SameLine(110.0f);
-            ImGui::PushItemWidth(-1.0f);
-            ImGui::ColorEdit3("##skytop", s_SkyColor);
-            ImGui::PopItemWidth();
-            ImGui::Text("  Horizon    :");
-            ImGui::SameLine(110.0f);
-            ImGui::PushItemWidth(-1.0f);
-            ImGui::ColorEdit3("##skyhorizon", s_SkyHorizonColor);
-            ImGui::PopItemWidth();
-        } else {
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.30f, 0.30f, 1.0f));
-            ImGui::TextWrapped("HDRI loading not yet implemented.");
-            ImGui::PopStyleColor();
-        }
-
-        LabelSliderFloat("##ambint", "  Ambient    :", &s_AmbientIntensity, 0.0f, 1.0f);
-
-        ImGui::Spacing();
-        SubHeading("Directional Light");
-
-        ImGui::Text("  Enable     :");
-        ImGui::SameLine(110.0f);
-        ImGui::Checkbox("##sunon", &s_EnableSun);
-
-        if (s_EnableSun) {
-            LabelSliderFloat("##sunaz",  "  Azimuth   :", &s_SunAzimuth,   0.0f,  360.0f, "%.1f deg");
-            LabelSliderFloat("##sunel",  "  Elevation :", &s_SunElevation, 0.0f,   90.0f, "%.1f deg");
-            ImGui::Text("  Color      :");
-            ImGui::SameLine(110.0f);
-            ImGui::PushItemWidth(-1.0f);
-            ImGui::ColorEdit3("##suncol", s_SunColor);
-            ImGui::PopItemWidth();
-            LabelSliderFloat("##sunint", "  Intensity :", &s_SunIntensity, 0.0f, 50.0f, "%.1f");
-        }
-
-        ImGui::Spacing();
-    }
-
-    // ============================================================
     // sectionPostProcessing
     // ============================================================
 
@@ -754,39 +706,39 @@ namespace VSTIR {
         if (!ImGui::CollapsingHeader("  Post-Processing"))
             return;
 
-        static const char* kToneMaps[] = { "None", "ACES", "Reinhard", "Filmic" };
-
-        LabelSliderFloat("##exposure", "  Exposure   :", &s_Exposure, 0.1f, 10.0f, "%.2f");
-        LabelSliderFloat("##gamma",    "  Gamma      :", &s_Gamma,    1.0f,  3.0f, "%.2f");
-
-        ImGui::Text("  Tone Map   :");
-        ImGui::SameLine(110.0f);
-        ImGui::PushItemWidth(-1.0f);
-        ImGui::Combo("##tonemap", &s_ToneMap, kToneMaps, 4);
-        ImGui::PopItemWidth();
-
-        ImGui::Spacing();
-        SubHeading("Effects");
-
-        ImGui::Text("  Vignette   :");
-        ImGui::SameLine(110.0f);
-        ImGui::Checkbox("##vignette", &s_Vignette);
-        if (s_Vignette) {
-            LabelSliderFloat("##vigstr", "  Strength   :", &s_VignetteStrength, 0.0f, 1.0f);
-        }
-
-        ImGui::Text("  Bloom      :");
-        ImGui::SameLine(110.0f);
-        ImGui::Checkbox("##bloom", &s_Bloom);
-        if (s_Bloom) {
-            LabelSliderFloat("##bloomthr", "  Threshold  :", &s_BloomThreshold, 0.0f, 5.0f, "%.2f");
-            LabelSliderFloat("##bloomstr", "  Strength   :", &s_BloomStrength,  0.0f, 1.0f, "%.3f");
-        }
+        // static const char* kToneMaps[] = { "None", "ACES", "Reinhard", "Filmic" };
+        //
+        // LabelSliderFloat("##exposure", "  Exposure   :", &s_Exposure, 0.1f, 10.0f, "%.2f");
+        // LabelSliderFloat("##gamma",    "  Gamma      :", &s_Gamma,    1.0f,  3.0f, "%.2f");
+        //
+        // ImGui::Text("  Tone Map   :");
+        // ImGui::SameLine(110.0f);
+        // ImGui::PushItemWidth(-1.0f);
+        // ImGui::Combo("##tonemap", &s_ToneMap, kToneMaps, 4);
+        // ImGui::PopItemWidth();
+        //
+        // ImGui::Spacing();
+        // SubHeading("Effects");
+        //
+        // ImGui::Text("  Vignette   :");
+        // ImGui::SameLine(110.0f);
+        // ImGui::Checkbox("##vignette", &s_Vignette);
+        // if (s_Vignette) {
+        //     LabelSliderFloat("##vigstr", "  Strength   :", &s_VignetteStrength, 0.0f, 1.0f);
+        // }
+        //
+        // ImGui::Text("  Bloom      :");
+        // ImGui::SameLine(110.0f);
+        // ImGui::Checkbox("##bloom", &s_Bloom);
+        // if (s_Bloom) {
+        //     LabelSliderFloat("##bloomthr", "  Threshold  :", &s_BloomThreshold, 0.0f, 5.0f, "%.2f");
+        //     LabelSliderFloat("##bloomstr", "  Strength   :", &s_BloomStrength,  0.0f, 1.0f, "%.3f");
+        // }
 
         ImGui::Text("  Denoiser   :");
         ImGui::SameLine(110.0f);
-        ImGui::Checkbox("##denoiser", &s_Denoiser);
-        if (s_Denoiser) {
+        ImGui::Checkbox("##denoiser", &_render_settings.denoiser);
+        if (_render_settings.denoiser) {
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.30f, 0.30f, 1.0f));
             ImGui::TextWrapped("Denoiser not yet implemented.");
             ImGui::PopStyleColor();
@@ -814,63 +766,6 @@ namespace VSTIR {
             return;
         }
 
-        if (s_SelectedMaterial >= matN) s_SelectedMaterial = 0;
-
-        ImGui::Text("  Material   :");
-        ImGui::SameLine(110.0f);
-        ImGui::PushItemWidth(-1.0f);
-        char matLabel[32];
-        snprintf(matLabel, sizeof(matLabel), "Material %d", s_SelectedMaterial);
-        if (ImGui::BeginCombo("##matsel", matLabel)) {
-            for (int i = 0; i < matN; i++) {
-                char entry[32];
-                snprintf(entry, sizeof(entry), "Material %d", i);
-                const bool sel = (s_SelectedMaterial == i);
-                if (ImGui::Selectable(entry, sel)) s_SelectedMaterial = i;
-                if (sel) ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-        ImGui::PopItemWidth();
-
-        ImGui::Spacing();
-        SubHeading("Surface");
-
-        ImGui::Text("  Albedo     :");
-        ImGui::SameLine(110.0f);
-        ImGui::PushItemWidth(-1.0f);
-        ImGui::ColorEdit3("##matalbedo", s_MatAlbedo);
-        ImGui::PopItemWidth();
-
-        LabelSliderFloat("##metallic",  "  Metallic   :", &s_MatMetallic,  0.0f, 1.0f);
-        LabelSliderFloat("##roughness", "  Roughness  :", &s_MatRoughness, 0.0f, 1.0f);
-        LabelSliderFloat("##ior",       "  IOR        :", &s_MatIOR,       1.0f, 3.0f, "%.3f");
-
-        ImGui::Spacing();
-        SubHeading("Emission");
-
-        ImGui::Text("  Color      :");
-        ImGui::SameLine(110.0f);
-        ImGui::PushItemWidth(-1.0f);
-        ImGui::ColorEdit3("##matemission", s_MatEmission);
-        ImGui::PopItemWidth();
-        LabelSliderFloat("##emintensity", "  Intensity  :", &s_MatEmissionIntensity, 0.0f, 100.0f, "%.1f");
-
-        ImGui::Spacing();
-        SubHeading("Transmission");
-
-        ImGui::Text("  Enable     :");
-        ImGui::SameLine(110.0f);
-        ImGui::Checkbox("##transmit", &s_MatTransmission);
-        if (s_MatTransmission) {
-            LabelSliderFloat("##transmitd", "  Depth      :", &s_MatTransmitDepth, 0.01f, 20.0f, "%.2f");
-        }
-
-        ImGui::Spacing();
-        if (ImGui::Button("Apply Material", ImVec2(-1.0f, 0.0f))) {
-            // TODO: Push material changes to GPU buffer
-        }
-        ImGui::Spacing();
     }
 
     // ============================================================
@@ -882,8 +777,7 @@ namespace VSTIR {
             const auto s = openFileExplorer({{"OBJ Files", "obj"}});
             if (s.empty()) return;
             INFO("Selected file: %s", s.c_str());
-            WARN("TODO: Allow LoadScene to be called after initialization");
-            // VSTIR::Editor::LoadScene(s);
+            Editor::LoadScene(s);
         }
     }
 

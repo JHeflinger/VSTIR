@@ -175,6 +175,7 @@ namespace VSTIR {
         size_t triangles_size;
         size_t emissives_size;
         size_t materials_size;
+        size_t raygen_size;
     };
 
     struct VulkanGeometry {

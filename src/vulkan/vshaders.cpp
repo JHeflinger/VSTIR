@@ -123,22 +123,22 @@ namespace VSTIR {
     				sizeof(NodeBVH)
     			}
     		};
-    	} else if (strcmp(name, "RayGeneratorSSBOIn") == 0) {
-    		return (VulkanBoundVariable) {
-    			STORAGE_BUFFER,
-    			(SchrodingRef) {
-    				true,
-    				&(_data.SSBO().buffer)
-    			},
-    			(SchrodingSize) {
-    				(SchrodingRef) {
-    					false,
-    					(void*)(_width * _height)
-    				}, 0.0f,
-    				sizeof(RayGenerator)
-    			}
-	    	};
-        }
+	} else if (strcmp(name, "RayGeneratorSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				true,
+				&(_data.SSBO().buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					false,
+					(void*)(_render_height * _render_width)
+				}, 0.0f,
+				sizeof(RayGenerator)
+			}
+	    };
+    }
         WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
     	return (VulkanBoundVariable){};
     }

@@ -15,15 +15,12 @@ namespace VSTIR {
     static bool IsInViewport(GLFWwindow* window, double xpos, double ypos) {
 
         (void)ypos;
-        // Use window size (logical pixels / points) — the same coordinate space
-        // as glfwGetCursorPos. glfwGetFramebufferSize returns physical pixels on
-        // macOS Retina and would produce a 2x mismatch.
-        int winWidth = 0, winHeight = 0;
-        glfwGetWindowSize(window, &winWidth, &winHeight);
-        if (winWidth <= 0 || winHeight <= 0) {
+        Editor* editor = static_cast<Editor*>(glfwGetWindowUserPointer(window));
+        if (!editor || editor->Width() == 0 || editor->Height() == 0) {
             return false;
         }
-        const double viewportWidth = (double)winWidth * (2.0 / 3.0);
+        // Cursor coordinates are in logical window space, matching editor viewport getters.
+        const double viewportWidth = (double)editor->ViewportWidth();
         return xpos >= 0.0 && xpos < viewportWidth;
     }
 
@@ -52,7 +49,8 @@ namespace VSTIR {
     }
 
     void Editor::LoadScene(std::string filepath) {
-        s_Editor.m_Renderer.LoadScene(filepath);
+        s_Editor.m_pending_scene_path = std::move(filepath);
+        s_Editor.m_has_pending_scene_load = true;
     }
 
     void Editor::Run() {
@@ -133,7 +131,7 @@ namespace VSTIR {
 
         if (editor->m_inputs.left_mouse_down || editor->m_inputs.right_mouse_down) {
             _renderer.GetCamera().handleMouse(dx, dy);
-            editor->m_Reset = true;
+            editor->m_camera_updated = true;
         }
         // if (editor->m_LeftMouseDown) {
         //     editor->HandlePan(dx, dy);
@@ -167,7 +165,7 @@ namespace VSTIR {
 
 
         if (winW > 0 && winH > 0) {
-            editor->m_Reset = true;
+            editor->m_camera_updated = true;
             Get()->m_Width = winW;
             Get()->m_Height = winH;
             Get()->m_Renderer.Resize((uint32_t)width, (uint32_t)height);
@@ -176,6 +174,14 @@ namespace VSTIR {
     }
 
     void Editor::Update(double delta_time) {
+        if (m_has_pending_scene_load) {
+            const std::string scenePath = m_pending_scene_path;
+            m_pending_scene_path.clear();
+            m_has_pending_scene_load = false;
+            m_Renderer.LoadScene(scenePath);
+            m_camera_updated = true;
+        }
+
         UpdateCameraPosition(delta_time);
 
         // Reserved for per-frame editor updates that are not input callbacks.
@@ -214,7 +220,7 @@ namespace VSTIR {
     void Editor::HandleZoom(double yoffset) {
         auto& cam = m_Renderer.GetCamera();
         cam.handleZoom(yoffset);
-        m_Reset = true;
+        m_camera_updated = true;
     }
 
     void Editor::UpdateCameraPosition(double delta_time) {
@@ -223,25 +229,32 @@ namespace VSTIR {
         if (!cam.IsOrbiting()) {
             glm::vec3 xz_direction = {0,0,0};
             glm::vec3 y_direction = {0,0,0};
+
+            glm::vec3 dir = {0,0,0};
             if (m_inputs.keys_held[Keybinds::MoveForward]) {
-                xz_direction += cam.getLookXZ();
+                dir += cam.getLookXZ();
             }
             if (m_inputs.keys_held[Keybinds::MoveBackward]) {
-                xz_direction -= cam.getLookXZ();
+                dir -= cam.getLookXZ();
             }
             if (m_inputs.keys_held[Keybinds::MoveRight]) { // right
-                xz_direction += glm::cross(cam.getLookXZ(), cam.getUp());
+                dir += glm::cross(cam.getLookXZ(), cam.getUp());
             }
             if (m_inputs.keys_held[Keybinds::MoveLeft]) {
-                xz_direction -= glm::cross(cam.getLookXZ(), cam.getUp());
+                dir -= glm::cross(cam.getLookXZ(), cam.getUp());
             }
             if (m_inputs.keys_held[Keybinds::MoveUp]) {
-                y_direction += cam.getUp();
+                dir += cam.getUp();
             }
             if (m_inputs.keys_held[Keybinds::MoveDown]) {
-                y_direction -= cam.getUp();
+                dir -= cam.getUp();
             }
-            cam.Position() += (xz_direction + y_direction) * cam.MovementSpeed() * float(delta_time);
+            if (dir != glm::vec3(0,0,0)) {
+                dir = glm::normalize(dir);
+                cam.Position() += dir * cam.MovementSpeed() * float(delta_time);
+                m_camera_updated = true;
+            }
+
         }
     }
 }

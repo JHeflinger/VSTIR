@@ -1,6 +1,8 @@
 #pragma once
 
 #include <unordered_map>
+#include <string>
+#include <algorithm>
 
 #include "util/safety.h"
 #include "core/renderer.h"
@@ -27,6 +29,8 @@ namespace VSTIR {
     public:
         Editor() {};
         ~Editor() {};
+        static constexpr float kViewportWidthRatio = 2.0f / 3.0f;
+        static constexpr float kViewportHeightRatio = 1.0f;
     public:
         static Editor* Get();
         static void Initialize(size_t width, size_t height);
@@ -50,7 +54,11 @@ namespace VSTIR {
         GLFWwindow* Window() { return m_Window; }
         size_t Width() { return m_Width; }
         size_t Height() { return m_Height; }
-        bool Reset() { bool r = m_Reset; m_Reset = false; return r; }
+        float ViewportWidthRatio() const { return kViewportWidthRatio; }
+        float ViewportHeightRatio() const { return kViewportHeightRatio; }
+        size_t ViewportWidth() const { return std::max<size_t>(1, (size_t)(m_Width * ViewportWidthRatio())); }
+        size_t ViewportHeight() const { return std::max<size_t>(1, (size_t)(m_Height * ViewportHeightRatio())); }
+        bool Reset() { bool r = m_camera_updated; m_camera_updated = false; return r; }
     // private:
         size_t m_Width = 0;
         size_t m_Height = 0;
@@ -58,6 +66,9 @@ namespace VSTIR {
         Renderer m_Renderer;
         InputVariables m_inputs;
 
-        bool m_Reset = false;
+        bool m_camera_updated = false;
+
+        bool m_has_pending_scene_load = false;
+        std::string m_pending_scene_path;
     };
 }

@@ -597,7 +597,7 @@ namespace VSTIR {
 
         constexpr int bar_start = 150;
 
-        Camera& cam = _camera;
+        camera& cam = _camera;
 
         // SubHeading("Live State");
 

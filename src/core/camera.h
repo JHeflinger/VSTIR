@@ -3,9 +3,9 @@
 
 
 namespace VSTIR {
-    class Camera {
+    class camera {
     public:
-        Camera() :
+        camera() :
         m_position({0.0f, 2.133f, 2.11f}),
         m_look({0,0, 1}),
         m_up({0,1,0}),

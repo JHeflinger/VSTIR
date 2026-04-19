@@ -570,7 +570,7 @@ namespace VSTIR {
         _render_settings._last_render_width = _render_width;
         _render_settings._last_render_height = _render_height;
         UI::initialize(_window);
-        m_Camera = Camera();
+        m_Camera = camera();
     }
 
     void Renderer::Render() {

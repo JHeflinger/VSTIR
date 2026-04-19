@@ -4,7 +4,7 @@
 #include "vulkan/vstructs.h"
 #include <cstddef>
 
-#include "Camera.h"
+#include "camera.h"
 
 namespace VSTIR {
 
@@ -34,7 +34,7 @@ namespace VSTIR {
         Backend& GetBackend() { return m_Backend; }
         CPUSwap& Swapchain() { return m_Swapchain; }
         Geometry& GetGeometry() { return m_Geometry; }
-        Camera& GetCamera() { return m_Camera; }
+        camera& GetCamera() { return m_Camera; }
 
         RenderSettings& GetSettings() { return m_settings; }
     private:
@@ -44,7 +44,7 @@ namespace VSTIR {
         CPUSwap m_Swapchain;
         Backend m_Backend;
         Geometry m_Geometry;
-        Camera m_Camera;
+        camera m_Camera;
         RenderSettings m_settings;
     };
 

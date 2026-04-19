@@ -33,6 +33,18 @@ namespace VSTIR {
         }
     }
 
+    void VContext::DestroyTarget() {
+        vkDestroyImageView(_interface, m_Target.view, nullptr);
+        vkDestroyImage(_interface, m_Target.image, nullptr);
+        vkFreeMemory(_interface, m_Target.memory, nullptr);
+        m_Target = {};
+    }
+
+    void VContext::ResizeTarget() {
+        DestroyTarget();
+        InitializeTarget();
+    }
+
     void VContext::InitializePipeline() {
         size_t num_shaders = _shaders.size();
         m_Pipeline.pipeline = (VkPipeline*)calloc(num_shaders, sizeof(VkPipeline));
@@ -77,8 +89,8 @@ namespace VSTIR {
 
     void VContext::InitializeTarget() {
         VUTILS::CreateImage(
-            _width,
-            _height,
+            _render_width,
+            _render_height,
             1,
             VK_SAMPLE_COUNT_1_BIT,
             VK_FORMAT_R8G8B8A8_UNORM,

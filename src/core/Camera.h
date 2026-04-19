@@ -14,12 +14,13 @@ namespace VSTIR {
         m_orbit_target({0,0,0})
         {}
 
-        glm::vec3 getLookXZ() { return glm::normalize(m_look * glm::vec3(1,0,1));}
 
         void setLook(glm::vec3 look);
         void setUp(glm::vec3 up);
         glm::vec3 getLook();
+        glm::vec3 getLookXZ() { return glm::normalize(m_look * glm::vec3(1,0,1));}
         glm::vec3 getUp();
+        void Reset();
 
         glm::vec3& Position() { return m_position; }
         float& Fov() { return m_fov; }

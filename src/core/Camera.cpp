@@ -24,6 +24,15 @@ namespace VSTIR {
         return m_up;
     }
 
+    void Camera::Reset() {
+        m_position = {0.0f, 2.133f, 2.11f};
+        m_look = {0,0, 1};
+        m_up = {0,1,0};
+        m_fov = 90;
+        m_orbiting = true;
+        m_orbit_target = {0,0,0};
+    }
+
 
     void Camera::handleMouse(double dx, double dy) {
         if (m_orbiting) {

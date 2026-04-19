@@ -11,6 +11,7 @@ namespace VSTIR {
     public:
         void Initialize();
         void Reconstruct();
+        void RecreateSSBO();
         VulkanDescriptors* Descriptors() { return m_Descriptors; }
         UBOArray& UBOs() { return m_UBOs; }
         VulkanDataBuffer& SSBO() { return m_SSBO; }

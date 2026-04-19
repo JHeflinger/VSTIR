@@ -26,9 +26,17 @@ namespace VSTIR {
         UpdateDescriptors();
     }
 
+    void VData::RecreateSSBO() {
+        VUTILS::DestroyBuffer(m_SSBO);
+        m_SSBO = {};
+        InitializeSSBO();
+    }
+
     void VData::InitializeSSBO() {
-        uint32_t imgw = _width;
-        uint32_t imgh = _height;
+        uint32_t imgw = _render_width;
+        uint32_t imgh = _render_height;
+
+        _renderer.GetGeometry().raygen_size = imgw * imgh;
         RayGenerator* raygens = (RayGenerator*)calloc(imgw * imgh, sizeof(RayGenerator));
 
         VkDeviceSize bufferSize = sizeof(RayGenerator) * imgw * imgh;
@@ -152,8 +160,8 @@ namespace VSTIR {
         ubo.seed = random_u32();
 
         //
-        ubo.width = _width;
-        ubo.height = _height;
+        ubo.width = _render_width;
+        ubo.height = _render_height;
 
 
         // Samples

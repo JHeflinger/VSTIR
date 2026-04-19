@@ -49,6 +49,7 @@ namespace VSTIR {
         void HandleZoom(double yoffset);
     public:
 
+
         void UpdateCameraPosition(double delta_time);
         Renderer& GetRenderer() { return m_Renderer; }
         GLFWwindow* Window() { return m_Window; }
@@ -58,7 +59,8 @@ namespace VSTIR {
         float ViewportHeightRatio() const { return kViewportHeightRatio; }
         size_t ViewportWidth() const { return std::max<size_t>(1, (size_t)(m_Width * ViewportWidthRatio())); }
         size_t ViewportHeight() const { return std::max<size_t>(1, (size_t)(m_Height * ViewportHeightRatio())); }
-        bool Reset() { bool r = m_camera_updated; m_camera_updated = false; return r; }
+        void UpdateRender() {m_render_updated = true;}
+        bool CheckRenderUpdate() { bool r = m_render_updated; m_render_updated = false; return r; }
     // private:
         size_t m_Width = 0;
         size_t m_Height = 0;
@@ -66,7 +68,7 @@ namespace VSTIR {
         Renderer m_Renderer;
         InputVariables m_inputs;
 
-        bool m_camera_updated = false;
+        bool m_render_updated = false; // signals redrawing
 
         bool m_has_pending_scene_load = false;
         std::string m_pending_scene_path;

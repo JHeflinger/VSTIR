@@ -165,7 +165,7 @@ namespace VSTIR {
 
 
         // Samples
-        if (Editor::Get()->Reset() || !render_settings.accumulate_samples) render_settings.sample_count = 0;
+        if (Editor::Get()->CheckRenderUpdate() || !render_settings.accumulate_samples) render_settings.sample_count = 0;
         ubo.samples = render_settings.sample_count;
         if (render_settings.accumulate_samples) render_settings.sample_count++;
 

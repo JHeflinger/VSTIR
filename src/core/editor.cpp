@@ -131,7 +131,7 @@ namespace VSTIR {
 
         if (editor->m_inputs.left_mouse_down || editor->m_inputs.right_mouse_down) {
             _renderer.GetCamera().handleMouse(dx, dy);
-            editor->m_camera_updated = true;
+            editor->m_render_updated = true;
         }
         // if (editor->m_LeftMouseDown) {
         //     editor->HandlePan(dx, dy);
@@ -165,7 +165,7 @@ namespace VSTIR {
 
 
         if (winW > 0 && winH > 0) {
-            editor->m_camera_updated = true;
+            editor->m_render_updated = true;
             Get()->m_Width = winW;
             Get()->m_Height = winH;
             Get()->m_Renderer.Resize((uint32_t)width, (uint32_t)height);
@@ -179,7 +179,7 @@ namespace VSTIR {
             m_pending_scene_path.clear();
             m_has_pending_scene_load = false;
             m_Renderer.LoadScene(scenePath);
-            m_camera_updated = true;
+            m_render_updated = true;
         }
 
         UpdateCameraPosition(delta_time);
@@ -220,7 +220,7 @@ namespace VSTIR {
     void Editor::HandleZoom(double yoffset) {
         auto& cam = m_Renderer.GetCamera();
         cam.handleZoom(yoffset);
-        m_camera_updated = true;
+        m_render_updated = true;
     }
 
     void Editor::UpdateCameraPosition(double delta_time) {
@@ -252,7 +252,7 @@ namespace VSTIR {
             if (dir != glm::vec3(0,0,0)) {
                 dir = glm::normalize(dir);
                 cam.Position() += dir * cam.MovementSpeed() * float(delta_time);
-                m_camera_updated = true;
+                m_render_updated = true;
             }
 
         }

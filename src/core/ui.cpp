@@ -603,8 +603,12 @@ namespace VSTIR {
 
         ImGui::Text("  Mode      :");
         ImGui::SameLine(bar_start);
-        SegmentedToggle("Orbit", "Free Look", &cam.IsOrbiting());
 
+        bool prev = cam.IsOrbiting();
+        SegmentedToggle("Orbit", "Free Look", &cam.IsOrbiting());
+        if (prev != cam.IsOrbiting()) {
+            _update_render;
+        }
         ImGui::Spacing();
 
         if (cam.IsOrbiting()) {

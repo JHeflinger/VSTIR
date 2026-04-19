@@ -26,9 +26,17 @@ namespace VSTIR {
         UpdateDescriptors();
     }
 
+    void VData::RecreateSSBO() {
+        VUTILS::DestroyBuffer(m_SSBO);
+        m_SSBO = {};
+        InitializeSSBO();
+    }
+
     void VData::InitializeSSBO() {
-        uint32_t imgw = _width;
-        uint32_t imgh = _height;
+        uint32_t imgw = _render_width;
+        uint32_t imgh = _render_height;
+
+        _renderer.GetGeometry().raygen_size = imgw * imgh;
         RayGenerator* raygens = (RayGenerator*)calloc(imgw * imgh, sizeof(RayGenerator));
 
         VkDeviceSize bufferSize = sizeof(RayGenerator) * imgw * imgh;
@@ -147,20 +155,31 @@ namespace VSTIR {
 
     void VData::UpdateUBOs() {
         UniformBufferObject ubo{};
+        auto& render_settings = _renderer.GetSettings();
         ubo.triangles = _renderer.GetGeometry().triangles.size();
-        ubo.width = _width;
-        ubo.height = _height;
         ubo.seed = random_u32();
-        if (Editor::Get()->Reset()) m_Samples = 0; 
-        ubo.samples = m_Samples;
-        m_Samples++;
-        ubo.fov = _renderer.GetCamera().fov;
-        ubo.position = _renderer.GetCamera().position;
-        ubo.look = glm::normalize(_renderer.GetCamera().look - ubo.position);
-        ubo.up = glm::normalize(_renderer.GetCamera().up);
+
+        //
+        ubo.width = _render_width;
+        ubo.height = _render_height;
+
+
+        // Samples
+        if (Editor::Get()->CheckRenderUpdate() || !render_settings.accumulate_samples) render_settings.sample_count = 0;
+        ubo.samples = render_settings.sample_count;
+        if (render_settings.accumulate_samples) render_settings.sample_count++;
+
+
+        // Camera
+        ubo.fov = glm::radians(_renderer.GetCamera().Fov());
+        ubo.position = _renderer.GetCamera().Position();
+        ubo.look = _renderer.GetCamera().getLook();
+        ubo.up = _renderer.GetCamera().getUp();
         ubo.w = -ubo.look;
         ubo.u = glm::normalize(glm::cross(ubo.up, ubo.w));
         ubo.v = glm::normalize(glm::cross(ubo.w, ubo.u));
+
+
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 

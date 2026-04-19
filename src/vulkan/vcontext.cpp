@@ -7,7 +7,7 @@
 namespace VSTIR {
 
     void VContext::Initialize() {
-        InitializeSwapchain();
+        InitializeSwapchain((uint32_t)_width, (uint32_t)_height);
         InitializeTarget();
         m_Data.Initialize();
         InitializePipeline();
@@ -15,6 +15,34 @@ namespace VSTIR {
 
     void VContext::Reconstruct() {
         m_Data.Reconstruct();
+    }
+
+    void VContext::ResizeSwapchain(uint32_t width, uint32_t height) {
+        if (width == 0 || height == 0) {
+            return;
+        }
+        VkSwapchainKHR oldSwapchain = m_Swapchain.swapchain;
+        for (VkImageView view : m_Swapchain.views) {
+            vkDestroyImageView(_interface, view, nullptr);
+        }
+        m_Swapchain.views.clear();
+        m_Swapchain.images.clear();
+        InitializeSwapchain(width, height, oldSwapchain);
+        if (oldSwapchain != VK_NULL_HANDLE) {
+            vkDestroySwapchainKHR(_interface, oldSwapchain, nullptr);
+        }
+    }
+
+    void VContext::DestroyTarget() {
+        vkDestroyImageView(_interface, m_Target.view, nullptr);
+        vkDestroyImage(_interface, m_Target.image, nullptr);
+        vkFreeMemory(_interface, m_Target.memory, nullptr);
+        m_Target = {};
+    }
+
+    void VContext::ResizeTarget() {
+        DestroyTarget();
+        InitializeTarget();
     }
 
     void VContext::InitializePipeline() {
@@ -61,8 +89,8 @@ namespace VSTIR {
 
     void VContext::InitializeTarget() {
         VUTILS::CreateImage(
-            _width,
-            _height,
+            _render_width,
+            _render_height,
             1,
             VK_SAMPLE_COUNT_1_BIT,
             VK_FORMAT_R8G8B8A8_UNORM,
@@ -79,7 +107,7 @@ namespace VSTIR {
             1);
     }
 
-    void VContext::InitializeSwapchain() {
+    void VContext::InitializeSwapchain(uint32_t width, uint32_t height, VkSwapchainKHR oldSwapchain) {
         VkSurfaceKHR surface = _general.Surface();
         VkSurfaceCapabilitiesKHR caps;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(_gpu, surface, &caps);
@@ -98,7 +126,7 @@ namespace VSTIR {
         info.minImageCount = std::min(caps.minImageCount + 1, caps.maxImageCount > 0 ? caps.maxImageCount : UINT32_MAX);
         info.imageFormat = chosen.format;
         info.imageColorSpace = chosen.colorSpace;
-        info.imageExtent = { (uint32_t)_width, (uint32_t)_height };
+        info.imageExtent = { width, height };
         info.imageArrayLayers = 1;
         info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -106,6 +134,7 @@ namespace VSTIR {
         info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
         info.presentMode = VK_PRESENT_MODE_FIFO_KHR;
         info.clipped = VK_TRUE;
+        info.oldSwapchain = oldSwapchain;
 
         m_Swapchain.format = chosen.format;
         m_Swapchain.extent = info.imageExtent;
@@ -123,6 +152,18 @@ namespace VSTIR {
             vinfo.format = chosen.format;
             vinfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
             vkCreateImageView(_interface, &vinfo, nullptr, &m_Swapchain.views[i]);
+        }
+    }
+
+    void VContext::DestroySwapchain() {
+        for (VkImageView view : m_Swapchain.views) {
+            vkDestroyImageView(_interface, view, nullptr);
+        }
+        m_Swapchain.views.clear();
+        m_Swapchain.images.clear();
+        if (m_Swapchain.swapchain != VK_NULL_HANDLE) {
+            vkDestroySwapchainKHR(_interface, m_Swapchain.swapchain, nullptr);
+            m_Swapchain.swapchain = VK_NULL_HANDLE;
         }
     }
 

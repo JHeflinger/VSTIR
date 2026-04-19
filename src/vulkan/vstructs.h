@@ -52,7 +52,7 @@ namespace VSTIR {
     struct VulkanSyncro {
         VkFence fence;
         VkSemaphore imageAvailable;
-        VkSemaphore renderFinished;
+        std::vector<VkSemaphore> renderFinished;
     };
 
     struct VulkanCommands {
@@ -175,6 +175,7 @@ namespace VSTIR {
         size_t triangles_size;
         size_t emissives_size;
         size_t materials_size;
+        size_t raygen_size;
     };
 
     struct VulkanGeometry {
@@ -216,11 +217,11 @@ namespace VSTIR {
         std::string filepath;
     };
 
-    struct Camera {
-        glm::vec3 position;
-        glm::vec3 look;
-        glm::vec3 up;
-    	float fov;
-    };
+    // struct Camera {
+    //     glm::vec3 position;
+    //     glm::vec3 look;
+    //     glm::vec3 up;
+    // 	float fov;
+    // };
 
 }

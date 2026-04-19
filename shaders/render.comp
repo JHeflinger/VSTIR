@@ -454,6 +454,12 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
 }
 
 void main() {
+    // dispatch rounds up to full 256-thread groups.
+    // drops padded lanes past width*height to prevent out-of-bounds SSBO/image writes.
+    uint pixelCount = uint(ubo.width) * uint(ubo.height);
+    if (gl_GlobalInvocationID.x >= pixelCount) return;
+
+
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     if (ubo.samples == 0) {

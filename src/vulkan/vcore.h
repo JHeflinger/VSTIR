@@ -13,6 +13,7 @@ namespace VSTIR {
     public:
         void Initialize();
         void Reconstruct();
+        void RecreateBridge();
         VGeneral& General() { return m_General; }
         VContext& Context() { return m_Context; }
         VScheduler& Scheduler() { return m_Scheduler; }

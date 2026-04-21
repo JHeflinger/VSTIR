@@ -1,0 +1,222 @@
+#version 450
+
+#define TILE_SIZE 16
+#define LEVELS 3
+#define CORRECTION (0.6745)
+
+struct Options 
+{
+    float bias;
+};
+
+layout(local_size_x = TILE_SIZE, local_size_y = TILE_SIZE) in;
+
+layout(binding = 0, rgba32f) readonly uniform image2D inputImage;
+layout(binding = 1, rgba32f) writeonly uniform image2D outputImage;
+layout(binding = 2) buffer DenoiseOptionIn
+{
+    Options opt;
+};
+
+shared vec4 full_tile[TILE_SIZE][TILE_SIZE];
+
+shared float rtile[TILE_SIZE][TILE_SIZE];
+shared float gtile[TILE_SIZE][TILE_SIZE];
+shared float btile[TILE_SIZE][TILE_SIZE];
+
+shared float rmedian_tile[(TILE_SIZE/2) * (TILE_SIZE/2)];
+shared float gmedian_tile[(TILE_SIZE/2) * (TILE_SIZE/2)];
+shared float bmedian_tile[(TILE_SIZE/2) * (TILE_SIZE/2)];
+
+#define LID ivec2(gl_LocalInvocationID.xy)
+
+
+void horizontal_haar(int size, float tile[TILE_SIZE][TILE_SIZE])
+{
+    if (LID.y < size && LID.x < size/2)
+    {
+        float a = tile[LID.y][LID.x * 2];
+        float b = tile[LID.y][LID.x * 2 + 1];
+
+        tile[LID.y][LID.x] = (a + b) * 0.5;
+        tile[LID.y][LID.x + size/2] = (a - b) * 0.5;
+    }
+}
+
+void vertical_haar(int size, float tile[TILE_SIZE][TILE_SIZE])
+{
+    if (LID.x < size && LID.y < size/2)
+    {
+        float a = tile[LID.y * 2][LID.x];
+        float b = tile[LID.y * 2 + 1][LID.x];
+        tile[LID.y][LID.x] = (a + b) * 0.5;
+        tile[LID.y + size/2][LID.x] = (a - b) * 0.5;
+    }
+}
+
+void vertical_inv_haar(int size, float tile[TILE_SIZE][TILE_SIZE])
+{
+    if (LID.x < size && LID.y < size/2)
+    {
+        float low  = tile[LID.y][LID.x];
+        float high = tile[LID.y + size/2][LID.x];
+        tile[LID.y * 2][LID.x]  = low + high;
+        tile[LID.y * 2 + 1][LID.x] = low - high;
+    }
+}
+
+void horizontal_inv_haar(int size, float tile[TILE_SIZE][TILE_SIZE])
+{
+    if (LID.y < size && LID.x < size/2)
+    {
+        float low  = tile[LID.y][LID.x];
+        float high = tile[LID.y][LID.x + size/2];
+        tile[LID.y][LID.x * 2] = low + high;
+        tile[LID.y][LID.x * 2 + 1] = low - high;
+    }
+}
+
+void compute_median_tile(float median_tile[TILE_SIZE/2 * TILE_SIZE/2], float tile[TILE_SIZE][TILE_SIZE])
+{
+    int size = TILE_SIZE >> 1;
+    if (LID.x < size && LID.y < size)
+    {
+        median_tile[LID.y * size + LID.x] = tile[LID.y + size][LID.x + size];
+    }
+}
+
+
+void sort_median_tile(float median_tile[TILE_SIZE/2 * TILE_SIZE/2])
+{
+    uint size = TILE_SIZE >> 1;
+    uint N = size * size;
+    uint idx = LID.y * size + LID.x;
+
+    if (LID.x >= size || LID.y >= size) return;
+
+    for (uint k = 2; k <= N; k <<= 1)
+    {
+        for (uint j = k >> 1; j > 0; j >>= 1)
+        {
+            uint ixj = idx ^ j;
+
+            if (ixj > idx)
+            {
+                bool ascending = ((idx & k) == 0);
+
+                float a = median_tile[idx];
+                float b = median_tile[ixj];
+
+                if ((abs(a) > abs(b)) == ascending)
+                {
+                    median_tile[idx] = b;
+                    median_tile[ixj] = a;
+                }
+            }
+
+            barrier();
+        }
+    }
+}
+
+float soft_threshold(float value, float t)
+{
+    return sign(value) * max(abs(value) - t, 0.0);
+}
+
+void soft_threshold(float median_tile[TILE_SIZE/2 * TILE_SIZE/2], float tile[TILE_SIZE][TILE_SIZE])
+{
+    int size = TILE_SIZE >> 1;
+
+    uint N = size * size;
+    uint medianIndex = N / 2;
+
+    float t = abs(median_tile[medianIndex]) / CORRECTION + opt.bias;
+
+    if (! (LID.x < size && LID.y < size))
+    {
+        tile[LID.y][LID.x] = soft_threshold(tile[LID.y][LID.x], t);
+    }
+}
+
+void forward_pass(float tile[TILE_SIZE][TILE_SIZE])
+{
+    int size = TILE_SIZE;
+    for (int level = 0; level < LEVELS; level++)
+    {
+        horizontal_haar(size, tile);
+        barrier();
+
+        vertical_haar(size, tile);
+        barrier();
+
+        size = size >> 1;
+    }
+}
+
+void filter(float median_tile[TILE_SIZE/2 * TILE_SIZE/2], float tile[TILE_SIZE][TILE_SIZE])
+{
+    compute_median_tile(median_tile, tile);
+    barrier();
+
+    sort_median_tile(median_tile);
+    barrier();
+
+    soft_threshold(median_tile, tile);
+    barrier();
+}
+
+void backward_pass(float tile[TILE_SIZE][TILE_SIZE])
+{
+    int size = TILE_SIZE >> (LEVELS - 1);
+
+    for (int level = LEVELS - 1; level >= 0; level--)
+    {
+        vertical_inv_haar(size, tile);
+        barrier();
+
+        horizontal_inv_haar(size, tile);
+        barrier();
+
+        size = size << 1;
+    }
+}
+
+void main()
+{
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imgSize = imageSize(inputImage);
+
+    vec4 value = vec4(0.0);
+
+    if (gid.x < imgSize.x && gid.y < imgSize.y)
+        value = imageLoad(inputImage, gid);
+
+    rtile[LID.y][LID.x] = value.r;
+    gtile[LID.y][LID.x] = value.g;
+    btile[LID.y][LID.x] = value.b;
+    barrier();
+
+    forward_pass(rtile);
+    forward_pass(gtile);
+    forward_pass(btile);
+    filter(rmedian_tile, rtile);
+    filter(gmedian_tile, gtile);
+    filter(bmedian_tile, btile);
+    backward_pass(rtile);
+    backward_pass(gtile);
+    backward_pass(btile);
+
+    full_tile[LID.y][LID.x] = 
+        vec4(
+                rtile[LID.y][LID.x],
+                gtile[LID.y][LID.x],
+                btile[LID.y][LID.x],
+                1.
+                );
+
+    if (gid.x < imgSize.x && gid.y < imgSize.y)
+    {
+        imageStore(outputImage, gid, full_tile[LID.y][LID.x]);
+    }
+}

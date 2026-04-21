@@ -3,8 +3,17 @@
 #include "core/get.h"
 #include "util/log.h"
 #include <cstring>
+#include <random>
 
 namespace VSTIR {
+
+    uint32_t random_u32() {
+        static std::mt19937 rng(std::random_device{}());
+        static std::uniform_int_distribution<uint32_t> dist(
+            0, std::numeric_limits<uint32_t>::max()
+        );
+        return dist(rng);
+    }
 
     void VData::Initialize() {
         m_Descriptors = (VulkanDescriptors*)calloc(_shaders.size(), sizeof(VulkanDescriptors));
@@ -13,11 +22,22 @@ namespace VSTIR {
         InitializeDescriptors();
     }
 
+    void VData::Reconstruct() {
+        UpdateDescriptors();
+    }
+
+    void VData::RecreateSSBO() {
+        VUTILS::DestroyBuffer(m_SSBO);
+        m_SSBO = {};
+        InitializeSSBO();
+    }
+
     void VData::InitializeSSBO() {
-        uint32_t imgw = _width;
-        uint32_t imgh = _height;
+        uint32_t imgw = _render_width;
+        uint32_t imgh = _render_height;
+
+        _renderer.GetGeometry().raygen_size = imgw * imgh;
         RayGenerator* raygens = (RayGenerator*)calloc(imgw * imgh, sizeof(RayGenerator));
-        for (size_t i = 0; i < imgw * imgh; i++) raygens[i].tid = (uint32_t)-1;
 
         VkDeviceSize bufferSize = sizeof(RayGenerator) * imgw * imgh;
         VulkanDataBuffer stagingBuffer;
@@ -134,7 +154,33 @@ namespace VSTIR {
     }
 
     void VData::UpdateUBOs() {
-        // TODO:
+        UniformBufferObject ubo{};
+        auto& render_settings = _renderer.GetSettings();
+        ubo.triangles = _renderer.GetGeometry().triangles.size();
+        ubo.seed = random_u32();
+
+        //
+        ubo.width = _render_width;
+        ubo.height = _render_height;
+
+
+        // Samples
+        if (Editor::Get()->CheckRenderUpdate() || !render_settings.accumulate_samples) render_settings.sample_count = 0;
+        ubo.samples = render_settings.sample_count;
+        if (render_settings.accumulate_samples) render_settings.sample_count++;
+
+
+        // Camera
+        ubo.fov = glm::radians(_renderer.GetCamera().Fov());
+        ubo.position = _renderer.GetCamera().Position();
+        ubo.look = _renderer.GetCamera().getLook();
+        ubo.up = _renderer.GetCamera().getUp();
+        ubo.w = -ubo.look;
+        ubo.u = glm::normalize(glm::cross(ubo.up, ubo.w));
+        ubo.v = glm::normalize(glm::cross(ubo.w, ubo.u));
+
+
+        memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 
 }

@@ -22,6 +22,7 @@ target_link_libraries(vstir PRIVATE
     glm::glm
     imgui
     GPUOpen::VulkanMemoryAllocator
+    nfd
 )
 
 # Platform-specific flags

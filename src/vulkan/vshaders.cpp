@@ -33,7 +33,112 @@ namespace VSTIR {
     			},
     			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
     		};
-        }
+        } else if (strcmp(name, "UniformBufferObject") == 0) {
+    		return (VulkanBoundVariable) {
+    			UNIFORM_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_data.UBOs().object.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					false,
+    					(void*)1
+    				}, 0.0f,
+    				sizeof(UniformBufferObject)
+    			},
+    		};
+    	} else if (strcmp(name, "TriangleSSBOIn") == 0) {
+    		return (VulkanBoundVariable) {
+    			STORAGE_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_core.Geometry().triangles.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					true,
+    					&(_renderer.GetGeometry().triangles_size)
+    				}, 0.0f,
+    				sizeof(Triangle)
+    			}
+    		};
+    	} else if (strcmp(name, "VertexSSBOIn") == 0) {
+    		return (VulkanBoundVariable) {
+    			STORAGE_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_core.Geometry().vertices.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					true,
+    					&(_renderer.GetGeometry().vertices_size)
+    				}, 0.0f,
+    				sizeof(glm::vec4)
+    			}
+    		};
+    	} else if (strcmp(name, "NormalsSSBOIn") == 0) {
+    		return (VulkanBoundVariable) {
+    			STORAGE_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_core.Geometry().normals.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					true,
+    					&(_renderer.GetGeometry().normals_size)
+    				}, 0.0f,
+    				sizeof(glm::vec4)
+    			}
+    		};
+    	} else if (strcmp(name, "MaterialsSSBOIn") == 0) {
+    		return (VulkanBoundVariable) {
+    			STORAGE_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_core.Geometry().materials.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					true,
+    					&(_renderer.GetGeometry().materials_size)
+    				}, 0.0f,
+    				sizeof(Material)
+    			}
+    		};
+    	} else if (strcmp(name, "BVHNodeSSBOIn") == 0) {
+    		return (VulkanBoundVariable) {
+    			STORAGE_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_core.Geometry().bvh.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					true,
+    					&(_renderer.GetGeometry().bvh_size)
+    				}, 0.0f,
+    				sizeof(NodeBVH)
+    			}
+    		};
+	} else if (strcmp(name, "RayGeneratorSSBOIn") == 0) {
+		return (VulkanBoundVariable) {
+			STORAGE_BUFFER,
+			(SchrodingRef) {
+				true,
+				&(_data.SSBO().buffer)
+			},
+			(SchrodingSize) {
+				(SchrodingRef) {
+					true,
+					&(_renderer.GetGeometry().raygen_size)
+				}, 0.0f,
+				sizeof(RayGenerator)
+			}
+	    };
+    }
         WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
     	return (VulkanBoundVariable){};
     }

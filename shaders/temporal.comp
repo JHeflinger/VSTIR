@@ -3,11 +3,6 @@
 #define MAX_RECURSIVE_DEPTH 2000
 #define EPS 0.000001
 
-// TODO: put this in the ubo
-#define DEPTH_THRESHOLD 0.03
-#define NORMAL_THRESHOLD 0.8
-#define MAX_TEMPORAL_CONTRIBUTION 30
-
 struct Triangle {
     uint a;
     uint b;
@@ -74,6 +69,12 @@ layout(binding = 0) uniform UniformBufferObject {
     float width;
     float height;
     mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -222,8 +223,8 @@ void temporal_merge() {
     RayGenerator pg = raygenIn[int(pp.y * ubo.width + pp.x)];
     float cdepth = length(ubo.position - rg.wpos);
     float rel = abs(cdepth - pg.pdepth) / max(cdepth, EPS);
-    if (rel > DEPTH_THRESHOLD) return;
-    if (dot(pg.pnorm, rg.wnorm) < NORMAL_THRESHOLD) return;
+    if (rel > ubo.depththreshold) return;
+    if (dot(pg.pnorm, rg.wnorm) < ubo.normalthreshold) return;
 
     // visibility check
     vec3 pgrgdiff = pg.pypos - rg.wpos;
@@ -233,7 +234,7 @@ void temporal_merge() {
     if (shit.distance < length(pgrgdiff) - EPS) return;
 
     // clamp previous frame contirbution
-    pg.pM = min(pg.pM, MAX_TEMPORAL_CONTRIBUTION);
+    pg.pM = min(pg.pM, ubo.contributioncap);
 
     // merge resevoirs
     rg.M += pg.pM;

@@ -87,6 +87,12 @@ layout(binding = 0) uniform UniformBufferObject {
     float width;
     float height;
     mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
 } ubo;
 
 layout(binding = 1, rgba8) uniform image2D outputImage;

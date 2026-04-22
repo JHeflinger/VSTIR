@@ -3,13 +3,6 @@
 #define MAX_RECURSIVE_DEPTH 2000
 #define EPS 0.000001
 
-// TODO: put this in the ubo
-#define MAX_SPACIAL_CONTRIBUTION 30
-#define DEPTH_THRESHOLD 0.03
-#define NORMAL_THRESHOLD 0.8
-#define SPACIAL_RANGE 10
-#define SPACIAL_SAMPLES 5
-
 struct Triangle {
     uint a;
     uint b;
@@ -76,6 +69,12 @@ layout(binding = 0) uniform UniformBufferObject {
     float width;
     float height;
     mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -230,26 +229,32 @@ void spacial_merge(int rx, int ry) {
     rg.pnorm = rg.wnorm;
 
     // loop through and look for spacial samples
-    for (int i = 0; i < SPACIAL_SAMPLES; i++) {
+    for (uint i = 0; i < ubo.spacecount; i++) {
         // get a random coord from within range
-        int nx = rx + min(int(random() * float(SPACIAL_RANGE)), SPACIAL_RANGE - 1) - (SPACIAL_RANGE/2); // WARN: this can end up missing out on merging if it keeps hitting rejected pixels, and can also be weirdly biased if randomly hits the same pixel multiple times
-        int ny = ry + min(int(random() * float(SPACIAL_RANGE)), SPACIAL_RANGE - 1) - (SPACIAL_RANGE/2);
+        int nx = rx + min(int(random() * float(ubo.spacerange)), int(ubo.spacerange) - 1) - (int(ubo.spacerange)/2); // WARN: this can end up missing out on merging if it keeps hitting rejected pixels, and can also be weirdly biased if randomly hits the same pixel multiple times
+        int ny = ry + min(int(random() * float(ubo.spacerange)), int(ubo.spacerange) - 1) - (int(ubo.spacerange)/2);
         if (nx < 0 || nx >= ubo.width || ny < 0 || ny >= ubo.height) continue;
         RayGenerator ng = raygenIn[int(ny * ubo.width + nx)];
 
         // depth similarity
         float ndepth = length(ng.wpos - ubo.position);
-        if (abs(depth - ndepth) / depth > DEPTH_THRESHOLD) continue;
+        if (abs(depth - ndepth) / depth > ubo.depththreshold) continue;
 
         // normal similarity
-        if (dot(rg.wnorm, ng.wnorm) < NORMAL_THRESHOLD) continue;
+        if (dot(rg.wnorm, ng.wnorm) < ubo.normalthreshold) continue;
 
         // TODO: maybe spacial similarity would be good to do here? (check position diff)
 
         // TODO: check for visibility - omit for now bc expensive
+        vec3 ngrgdiff = ng.ypos - rg.wpos;
+        Ray sray = { rg.wpos + (rg.wnorm * EPS), normalize(ngrgdiff) };
+        uint shitid = -1;
+        Hit shit = trace(sray, shitid);
+        if (shit.distance < length(ngrgdiff) - EPS) return;
+
 
         // merge
-        ng.M = min(ng.M, MAX_SPACIAL_CONTRIBUTION);
+        ng.M = min(ng.M, ubo.contributioncap);
         float wN = ng.W * float(ng.M);
         rg.pM += ng.M;
         rg.pwsum += wN;

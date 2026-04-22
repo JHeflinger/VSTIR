@@ -130,6 +130,12 @@ namespace VSTIR {
         alignas(4) float width;
         alignas(4) float height;
         alignas(16) glm::mat4 previousvpm;
+        alignas(4) float depththreshold;
+        alignas(4) float normalthreshold;
+        alignas(4) uint32_t contributioncap;
+        alignas(4) uint32_t candidatecap;
+        alignas(4) uint32_t spacerange;
+        alignas(4) uint32_t spacecount;
     };
 
     struct VulkanSwapchain {

@@ -164,12 +164,18 @@ namespace VSTIR {
         ubo.width = _render_width;
         ubo.height = _render_height;
 
-
         // Samples
         if (Editor::Get()->CheckRenderUpdate() || !render_settings.accumulate_samples) render_settings.sample_count = 0;
         ubo.samples = render_settings.sample_count;
         if (render_settings.accumulate_samples) render_settings.sample_count++;
 
+        // restir settings
+        ubo.depththreshold = render_settings.depththreshold;
+        ubo.normalthreshold = render_settings.normalthreshold;
+        ubo.contributioncap = (uint32_t)render_settings.contributioncap;
+        ubo.candidatecap = (uint32_t)render_settings.candidatecap;
+        ubo.spacerange = (uint32_t)render_settings.spacerange;
+        ubo.spacecount = (uint32_t)render_settings.spacecount;
 
         // Camera
         ubo.fov = glm::radians(_renderer.GetCamera().Fov());

@@ -20,6 +20,13 @@ namespace VSTIR {
 
         bool denoiser = false; // TODO implement
         bool restir = false;
+
+        float depththreshold = 0.03f;
+        float normalthreshold = 0.95f;
+        int contributioncap = 20;
+        int candidatecap = 2;
+        int spacerange = 5;
+        int spacecount = 5;
     };
 
     class Renderer {

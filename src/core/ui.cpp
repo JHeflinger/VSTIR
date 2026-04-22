@@ -688,6 +688,10 @@ namespace VSTIR {
         ImGui::SameLine();
         ImGui::Checkbox("##accum", &render_settings.accumulate_samples);
 
+        ImGui::Text("  ReSTIR GI:");
+        ImGui::SameLine();
+        ImGui::Checkbox("##restirgi", &render_settings.restir);
+
         if (render_settings.accumulate_samples) {
             ImGui::SameLine();
             ImGui::Text("  Frames: %d", render_settings.sample_count);

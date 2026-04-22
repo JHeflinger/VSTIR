@@ -19,6 +19,7 @@ namespace VSTIR {
         uint32_t _last_render_height = 0;
 
         bool denoiser = false; // TODO implement
+        bool restir = false;
     };
 
     class Renderer {

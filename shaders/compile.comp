@@ -95,92 +95,37 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacecount;
 } ubo;
 
-layout(binding = 1, rgba8) uniform image2D outputImage;
-
-layout(binding = 2) readonly buffer TriangleSSBOIn {
+layout(binding = 1) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
 };
 
-layout(binding = 3) buffer BVHNodeSSBOIn {
+layout(binding = 2) buffer BVHNodeSSBOIn {
     NodeBVH bvhIn[ ];
 };
 
-layout(binding = 4) readonly buffer NormalsSSBOIn {
+layout(binding = 3) readonly buffer NormalsSSBOIn {
     vec3 normalIn[ ];
 };
 
-layout(binding = 5) readonly buffer VertexSSBOIn {
+layout(binding = 4) readonly buffer VertexSSBOIn {
     vec3 vertexIn[ ];
 };
 
-layout(binding = 6) readonly buffer MaterialsSSBOIn {
+layout(binding = 5) readonly buffer MaterialsSSBOIn {
     Material materialIn[ ];
 };
 
-layout(binding = 7) buffer RayGeneratorSSBOIn {
+layout(binding = 6) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
+
+layout(binding = 7, rgba8) uniform image2D outputImage;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 const float max_contribution = 10;
 const float PI = 3.14159265358979323846;
-bool stack_failure = false;
 uvec4 seed = uvec4(0);
-const uint SOBOL_DIRS[2][32] = uint[2][32](
-    uint[32](
-        0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
-        0x08000000u, 0x04000000u, 0x02000000u, 0x01000000u,
-        0x00800000u, 0x00400000u, 0x00200000u, 0x00100000u,
-        0x00080000u, 0x00040000u, 0x00020000u, 0x00010000u,
-        0x00008000u, 0x00004000u, 0x00002000u, 0x00001000u,
-        0x00000800u, 0x00000400u, 0x00000200u, 0x00000100u,
-        0x00000080u, 0x00000040u, 0x00000020u, 0x00000010u,
-        0x00000008u, 0x00000004u, 0x00000002u, 0x00000001u),
-    uint[32](
-        0x80000000u, 0xC0000000u, 0x60000000u, 0x30000000u,
-        0x88000000u, 0x44000000u, 0x22000000u, 0x11000000u,
-        0x80800000u, 0x40400000u, 0x20200000u, 0x10100000u,
-        0x08080000u, 0x04040000u, 0x02020000u, 0x01010000u,
-        0x00808000u, 0x00404000u, 0x00202000u, 0x00101000u,
-        0x00080800u, 0x00040400u, 0x00020200u, 0x00010100u,
-        0x00008080u, 0x00004040u, 0x00002020u, 0x00001010u,
-        0x00000808u, 0x00000404u, 0x00000202u, 0x00000101u)
-);
-
-uint sobol(uint index, int dimension) {
-    uint result = 0u;
-    for (int bit = 0; bit < 32; ++bit) {
-        if ((index & (1u << bit)) != 0u)
-            result ^= SOBOL_DIRS[dimension][bit];
-    }
-    return result;
-}
-
-uint hash(uint x) {
-    x ^= x >> 16;
-    x *= 0x7feb352du;
-    x ^= x >> 15;
-    x *= 0x846ca68bu;
-    x ^= x >> 16;
-    return x;
-}
-
-uint owen_scramble(uint value, uint seed) {
-    uint mask = seed;
-    for (uint bit = 0u; bit < 32u; ++bit) {
-        uint flip = hash(mask) & 1u;
-        value ^= flip << bit;
-        mask ^= 0x9e3779b9u;
-    }
-    return value;
-}
-
-float sobol_owen(uint index, int dimension, uint seed) {
-    uint v = sobol(index, dimension);
-    v = owen_scramble(v, seed + uint(dimension) * 0xA511E9B3u);
-    return float(v) * (1.0 / 4294967296.0);
-}
 
 float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
     cosi = clamp(cosi, -1.0, 1.0);
@@ -297,7 +242,7 @@ Hit trace(Ray ray, inout uint hit_id) {
     stack[stack_ptr++] = 0;
     while (stack_ptr > 0) {
         NodeBVH node = bvhIn[stack[--stack_ptr]];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { break; }
         if (node.config == 0) {
             Hit trihit;
             if (triangle_intersect(ray, node.left, trihit)) {
@@ -320,10 +265,6 @@ Hit trace(Ray ray, inout uint hit_id) {
         }
     }
     return hit;
-}
-
-float russian_roulette(vec3 throughput) {
-    return clamp(max(max(throughput.x, throughput.y), throughput.z), 0.05, 0.999);
 }
 
 vec3 onb(vec3 normal, vec3 local) {
@@ -376,106 +317,18 @@ vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, i
         max(0.0, dot(incoming, normal));
 }
 
-void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout int wavelength) {
-    switch (material.model) {
-        case LAMBERTIAN_MODEL:
-            float ks = luminance(material.specular);
-            float kd = luminance(material.diffuse);
-            float kskd = ks + kd;
-            float pd = kd/kskd;
-            float ps = ks/kskd;
-            vec3 R = reflect(-outgoing, h.normal);
-            incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
-            throughput = 
-                ((material.diffuse / PI) +
-                (material.specular * (material.shiny + 2.0) /
-                (2.0 * PI) * pow(max(dot(R, incoming), 0.0), material.shiny))) *
-                max(0.0, dot(incoming, h.normal));
-            pdf = (pd * diffuse_pdf(h.normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
-            break;
-        case MIRROR_MODEL:
-            incoming = reflect(-outgoing, h.normal);
-            throughput = material.specular;
-            pdf = 1.0;
-            break;
-        case DIELECTRIC_MODEL:
-            float cosi = dot(outgoing, h.normal);
-            float eta_i = ior;
-            float eta_t = material.ior;
-            float pdf_mod = 1.0;
-            uint mat_t = h.material;
-            vec3 absorb = beer_lambert(medium, length(previous - h.position));
-            vec3 dmask = vec3(1.0);
-            if (wavelength < 0 && material.dispersion != vec3(0)) {
-                pdf_mod = 0.33333333; // 1/3 chance to choose wavelength
-                wavelength = int(max(0, (random() - EPS))*3);
-                dmask = vec3(0.0);
-                dmask[wavelength] = 1.0;
-            }
-            if (wavelength >= 0 && material.dispersion != vec3(0)) eta_t *= material.dispersion[wavelength];
-            if (medium == mat_t) {
-                eta_t = 1.0;
-                mat_t = -1;
-            }
-            float F = fresnel_dielectric(cosi, eta_i, eta_t);
-            if (random() < F) {
-                incoming = reflect(-outgoing, h.normal);
-                throughput = vec3(F) * absorb * dmask;
-                pdf = F * pdf_mod;
-            } else {
-                float eta = (cosi > 0.0) ? eta_i / eta_t : eta_t / eta_i;
-                vec3 Nt = (cosi > 0.0) ? h.normal : -h.normal;
-                if (!refract_ray(-outgoing, Nt, eta, incoming)) {
-                    incoming = reflect(-outgoing, h.normal);
-                    throughput = vec3(1.0) * absorb * dmask;
-                    pdf = F * pdf_mod;
-                    return;
-                }
-                throughput = vec3(1.0 - F) * absorb * dmask;
-                pdf = (1.0 - F) * pdf_mod;
-                ior = eta_t;
-                medium = mat_t;
-            }
-            break;
-        default: break;
-    }
-}
-
-vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
-    vec3 throughput = vec3(1.0);
-    vec3 radiance = vec3(0.0);
-    bool firsthit = true;
-    uint hid = -1;
-    float ior = 1.0;
-    uint medium = -1;
-    int wavelength = -1;
-    for (uint i = 0; i < MAX_BOUNCES; i++) {
-        Hit h = trace(ray, hid);
-        if (firsthit) {
-            firsthit = false;
-            hit_id = hid;
-            hit_distance = h.distance;
-        }
-        if (h.distance <= 0) break;
-        Material material = materialIn[h.material];
-        if (material.emission != vec3(0.0)) {
-            radiance += throughput * material.emission;
-            break;
-        }
-        vec3 incoming;
-        vec3 color;
-        float pdf;
-        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium, wavelength);
-        if (pdf <= 0) break;
-        throughput *= color / pdf;
-        throughput = min(throughput, max_contribution);
-        float p = russian_roulette(throughput);
-        if (random() > p) break;
-        throughput /= p;
-        ray.position = h.position + (incoming * EPS);
-        ray.direction = incoming;
-    }
-    return radiance;
+vec3 compile_resevoir() {
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    Material mat = materialIn[rg.matid];
+    if (rg.hitid == -1 || mat.model == MIRROR_MODEL || mat.model == DIELECTRIC_MODEL) return vec3(0.0);
+    if (rg.pM == 0u || rg.pW <= 0.0) return vec3(0.0);
+    vec3 wi = normalize(rg.pypos - rg.wpos);
+    vec3 wo = normalize(ubo.position - rg.wpos);
+    vec3 brdf_cos = lambertian_throughput(wo, rg.wnorm, wi, mat);
+    float p_hat = luminance(brdf_cos * rg.pyradiance);
+    if (p_hat <= 0.0) return vec3(0.0);
+    float W_final = rg.pwsum / (float(rg.pM) * p_hat);
+    return brdf_cos * rg.pyradiance * W_final;
 }
 
 void main() {
@@ -483,14 +336,9 @@ void main() {
     if (gl_GlobalInvocationID.x >= pixelCount) return;
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-    if (ubo.samples == 0) {
-        raygenIn[gl_GlobalInvocationID.x].accumulation = vec3(0);
-    }
     init_random(rx, ry);
-    uint hit_id = -1;
-    float hit_distance = -1.0f;
-    vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id, hit_distance);
-    if (stack_failure) color = vec3(1.0, 0.0, 0.0);
+    vec3 color = compile_resevoir();
+    if (ubo.samples == 0) raygenIn[gl_GlobalInvocationID.x].accumulation = vec3(0);
     raygenIn[gl_GlobalInvocationID.x].accumulation += color;
     color = raygenIn[gl_GlobalInvocationID.x].accumulation;
     color /= float(ubo.samples + 1);

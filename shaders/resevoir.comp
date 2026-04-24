@@ -95,29 +95,27 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacecount;
 } ubo;
 
-layout(binding = 1, rgba8) uniform image2D outputImage;
-
-layout(binding = 2) readonly buffer TriangleSSBOIn {
+layout(binding = 1) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
 };
 
-layout(binding = 3) buffer BVHNodeSSBOIn {
+layout(binding = 2) buffer BVHNodeSSBOIn {
     NodeBVH bvhIn[ ];
 };
 
-layout(binding = 4) readonly buffer NormalsSSBOIn {
+layout(binding = 3) readonly buffer NormalsSSBOIn {
     vec3 normalIn[ ];
 };
 
-layout(binding = 5) readonly buffer VertexSSBOIn {
+layout(binding = 4) readonly buffer VertexSSBOIn {
     vec3 vertexIn[ ];
 };
 
-layout(binding = 6) readonly buffer MaterialsSSBOIn {
+layout(binding = 5) readonly buffer MaterialsSSBOIn {
     Material materialIn[ ];
 };
 
-layout(binding = 7) buffer RayGeneratorSSBOIn {
+layout(binding = 6) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
@@ -125,62 +123,7 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 const float max_contribution = 10;
 const float PI = 3.14159265358979323846;
-bool stack_failure = false;
 uvec4 seed = uvec4(0);
-const uint SOBOL_DIRS[2][32] = uint[2][32](
-    uint[32](
-        0x80000000u, 0x40000000u, 0x20000000u, 0x10000000u,
-        0x08000000u, 0x04000000u, 0x02000000u, 0x01000000u,
-        0x00800000u, 0x00400000u, 0x00200000u, 0x00100000u,
-        0x00080000u, 0x00040000u, 0x00020000u, 0x00010000u,
-        0x00008000u, 0x00004000u, 0x00002000u, 0x00001000u,
-        0x00000800u, 0x00000400u, 0x00000200u, 0x00000100u,
-        0x00000080u, 0x00000040u, 0x00000020u, 0x00000010u,
-        0x00000008u, 0x00000004u, 0x00000002u, 0x00000001u),
-    uint[32](
-        0x80000000u, 0xC0000000u, 0x60000000u, 0x30000000u,
-        0x88000000u, 0x44000000u, 0x22000000u, 0x11000000u,
-        0x80800000u, 0x40400000u, 0x20200000u, 0x10100000u,
-        0x08080000u, 0x04040000u, 0x02020000u, 0x01010000u,
-        0x00808000u, 0x00404000u, 0x00202000u, 0x00101000u,
-        0x00080800u, 0x00040400u, 0x00020200u, 0x00010100u,
-        0x00008080u, 0x00004040u, 0x00002020u, 0x00001010u,
-        0x00000808u, 0x00000404u, 0x00000202u, 0x00000101u)
-);
-
-uint sobol(uint index, int dimension) {
-    uint result = 0u;
-    for (int bit = 0; bit < 32; ++bit) {
-        if ((index & (1u << bit)) != 0u)
-            result ^= SOBOL_DIRS[dimension][bit];
-    }
-    return result;
-}
-
-uint hash(uint x) {
-    x ^= x >> 16;
-    x *= 0x7feb352du;
-    x ^= x >> 15;
-    x *= 0x846ca68bu;
-    x ^= x >> 16;
-    return x;
-}
-
-uint owen_scramble(uint value, uint seed) {
-    uint mask = seed;
-    for (uint bit = 0u; bit < 32u; ++bit) {
-        uint flip = hash(mask) & 1u;
-        value ^= flip << bit;
-        mask ^= 0x9e3779b9u;
-    }
-    return value;
-}
-
-float sobol_owen(uint index, int dimension, uint seed) {
-    uint v = sobol(index, dimension);
-    v = owen_scramble(v, seed + uint(dimension) * 0xA511E9B3u);
-    return float(v) * (1.0 / 4294967296.0);
-}
 
 float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
     cosi = clamp(cosi, -1.0, 1.0);
@@ -297,7 +240,7 @@ Hit trace(Ray ray, inout uint hit_id) {
     stack[stack_ptr++] = 0;
     while (stack_ptr > 0) {
         NodeBVH node = bvhIn[stack[--stack_ptr]];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { stack_failure = true; break; }
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { break; }
         if (node.config == 0) {
             Hit trihit;
             if (triangle_intersect(ray, node.left, trihit)) {
@@ -478,23 +421,90 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     return radiance;
 }
 
+void calculate_resevoir(Ray ray) {
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+
+    // cast primary ray
+    rg.hitid = -1;
+    Hit h = trace(ray, rg.hitid);
+    if (h.distance >= 0.0f) {
+        rg.wpos = ray.position + (ray.direction * h.distance);
+        rg.wnorm = h.normal;
+        rg.matid = h.material;
+
+        // cast secondary ray
+        rg.wsum = 0.0;
+        rg.M = 0;
+        for (int i = 0; i < ubo.candidatecap; i++) {
+            vec3 incoming;
+            float pdf;
+            vec3 f;
+            float ior = 1.0;
+            uint medium = -1;
+            int wavelength = -1;
+            brdf(-ray.direction, ray.position, h, materialIn[rg.matid], incoming, pdf, f, ior, medium, wavelength);
+            if (pdf <= 0) continue;
+
+            // calculate total path
+            Ray secondary;
+            secondary.position = h.position + (incoming * EPS);
+            secondary.direction = incoming;
+            uint hid = -1;
+            float hdist = -1.0f;
+            vec3 Li = pathtrace(secondary, hid, hdist);
+
+            // compute weight
+            float w = luminance(f * Li) / pdf;
+            if (w <= 0.0) continue;
+
+            // resevoir update
+            rg.M += 1;
+            rg.wsum += w;
+
+            // update latest secondary hit
+            if (random() < w / rg.wsum) {
+                Hit h2 = trace(secondary, hid); //WARN: there's definitely a more efficient way to do this outside of redoing an entire trace
+                rg.ypos = h2.position;
+                rg.ynorm = h2.normal;
+                rg.yradiance = Li;
+                rg.W = w;
+            }
+        }
+    }
+
+    raygenIn[gl_GlobalInvocationID.x] = rg;
+}
+
 void main() {
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+    init_random(rx, ry);
+
+    // TODO: can probaly delete later, this is just for sanity right now
     if (ubo.samples == 0) {
         raygenIn[gl_GlobalInvocationID.x].accumulation = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].wpos = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].wnorm = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].matid = -1;
+        raygenIn[gl_GlobalInvocationID.x].hitid = -1;
+        raygenIn[gl_GlobalInvocationID.x].ypos = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].ynorm = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].yradiance = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].W = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].wsum = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].M = 0;
+        raygenIn[gl_GlobalInvocationID.x].pypos = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].pynorm = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].pyradiance = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].pW = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].pwsum = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].pM = 0;
+        raygenIn[gl_GlobalInvocationID.x].pdepth = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].pnorm = vec3(0);
     }
-    init_random(rx, ry);
-    uint hit_id = -1;
-    float hit_distance = -1.0f;
-    vec3 color = pathtrace(create_ray(vec2(rx, ry)), hit_id, hit_distance);
-    if (stack_failure) color = vec3(1.0, 0.0, 0.0);
-    raygenIn[gl_GlobalInvocationID.x].accumulation += color;
-    color = raygenIn[gl_GlobalInvocationID.x].accumulation;
-    color /= float(ubo.samples + 1);
-    vec3 hdr_color = (color * ((color/20.0) + vec3(1.0)))/(vec3(1.0) + color);
-    hdr_color = pow(hdr_color, vec3(1.0 / 2.2));
-	imageStore(outputImage, ivec2(rx, ry), vec4(hdr_color, 1.0));
+
+
+    calculate_resevoir(create_ray(vec2(rx, ry)));
 }

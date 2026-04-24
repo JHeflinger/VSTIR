@@ -36,5 +36,7 @@ elseif(UNIX)
 endif()
 
 target_compile_definitions(vstir PRIVATE
+    GLM_FORCE_RADIANS
+    GLM_FORCE_DEPTH_ZERO_TO_ONE
     $<$<CONFIG:Debug>:VK_ENABLE_VALIDATION_LAYERS>
 )

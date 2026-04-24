@@ -1,0 +1,260 @@
+#version 450
+
+#define MAX_RECURSIVE_DEPTH 2000
+#define EPS 0.000001
+
+struct Triangle {
+    uint a;
+    uint b;
+    uint c;
+    uint an;
+    uint bn;
+    uint cn;
+    uint material;
+};
+
+struct NodeBVH {
+    vec3 min;
+    vec3 max;
+    uint config;
+    uint left;
+    uint right;
+};
+
+struct Ray {
+    vec3 position;
+    vec3 direction;
+};
+
+struct Hit {
+    float distance;
+    uint material;
+    vec3 normal;
+    vec3 position;
+};
+
+struct RayGenerator {
+    vec3 accumulation;
+    vec3 wpos;
+    vec3 wnorm;
+    uint matid;
+    uint hitid;
+    vec3 ypos;
+    vec3 ynorm;
+    vec3 yradiance;
+    float W;
+    float wsum;
+    uint M;
+    vec3 pypos;
+    vec3 pynorm;
+    vec3 pyradiance;
+    float pW;
+    float pwsum;
+    uint pM;
+    float pdepth;
+    vec3 pnorm;
+};
+
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+} ubo;
+
+layout(binding = 1) readonly buffer TriangleSSBOIn {
+    Triangle triangleIn[ ];
+};
+
+layout(binding = 2) buffer BVHNodeSSBOIn {
+    NodeBVH bvhIn[ ];
+};
+
+layout(binding = 3) readonly buffer NormalsSSBOIn {
+    vec3 normalIn[ ];
+};
+
+layout(binding = 4) readonly buffer VertexSSBOIn {
+    vec3 vertexIn[ ];
+};
+
+layout(binding = 5) buffer RayGeneratorSSBOIn {
+   RayGenerator raygenIn[ ];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+const float max_contribution = 10;
+const float PI = 3.14159265358979323846;
+uvec4 seed = uvec4(0);
+
+void init_random(int x, int y) {
+    seed = uvec4(x, y, ubo.seed, x + y);
+}
+
+void pcg4d(inout uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v.w += v.y * v.z;
+    v = v ^ (v >> 16u);
+    v.x += v.y * v.w;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v.w += v.y * v.z;
+}
+
+float random() {
+    pcg4d(seed);
+    return float(seed.x) / float(0xffffffffu);
+}
+
+Ray create_ray(vec2 rg) {
+	float r = ubo.width / 2.0;
+	float b = ubo.height / 2.0;
+	float l = -1.0 * r;
+	float t = -1.0 * b;
+    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
+    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
+	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
+    Ray ray;
+    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+    ray.position = ubo.position;
+    return ray;
+}
+
+bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
+    Triangle tri = triangleIn[triangle_ind];
+    vec3 _a = vertexIn[tri.a];
+    vec3 _b = vertexIn[tri.b];
+    vec3 _c = vertexIn[tri.c];
+    vec3 e1 = _b - _a;
+    vec3 e2 = _c - _a;
+    vec3 h = cross(ray.direction, e2);
+    float a = dot(e1, h);
+    if (abs(a) < EPS) return false;
+    float f = 1.0 / a;
+    vec3 s = ray.position - _a;
+    float u = f*dot(s, h);
+    if (u < 0.0 || u > 1.0) return false;
+    vec3 q = cross(s, e1);
+    float v = f*dot(ray.direction, q);
+    if (v < 0.0 || u + v > 1.0) return false;
+    hit.distance = f * dot(e2, q);
+    if (hit.distance <= EPS) return false;
+    hit.material = tri.material;
+    hit.position = ray.position + (ray.direction * hit.distance);
+    if (tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
+    else hit.normal = normalize(cross(e1, e2));
+    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
+    return true;
+}
+
+bool aabb_intersect(Ray ray, uint node_ind) {
+	vec3 dfrac = 1.0 / ray.direction;
+    vec3 mindif = (bvhIn[node_ind].min - ray.position)*dfrac;
+    vec3 maxdif = (bvhIn[node_ind].max - ray.position)*dfrac;
+	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
+	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
+    return tmax >= 0 && tmin <= tmax;
+}
+
+Hit trace(Ray ray, inout uint hit_id) {
+    Hit hit;
+    hit.distance = -1.0;
+    if (ubo.triangles == 0) return hit;
+    if (!aabb_intersect(ray, 0)) return hit;
+    uint stack[MAX_RECURSIVE_DEPTH];
+    int stack_ptr = 0;
+    stack[stack_ptr++] = 0;
+    while (stack_ptr > 0) {
+        NodeBVH node = bvhIn[stack[--stack_ptr]];
+        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { break; }
+        if (node.config == 0) {
+            Hit trihit;
+            if (triangle_intersect(ray, node.left, trihit)) {
+                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
+                    hit = trihit;
+					hit_id = node.left;
+                }
+            }
+        } else if (node.config == 1) {
+            if (aabb_intersect(ray, node.left))
+                stack[stack_ptr++] = node.left;
+        } else if (node.config == 2) {
+            if (aabb_intersect(ray, node.right))
+                stack[stack_ptr++] = node.right;
+        } else {
+            if (aabb_intersect(ray, node.left))
+                stack[stack_ptr++] = node.left;
+            if (aabb_intersect(ray, node.right))
+                stack[stack_ptr++] = node.right;
+        }
+    }
+    return hit;
+}
+
+void temporal_merge() {
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+
+    // reproject onto previous camera coordinate
+    vec4 clip = ubo.previousvpm * vec4(rg.wpos, 1.0);
+    if (clip.w <= 0) return;
+    vec3 ndc = clip.xyz / clip.w;
+    vec2 uv = vec2(ndc.x * 0.5 + 0.5, ndc.y * 0.5 + 0.5);
+    if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1) return;
+    ivec2 pp = ivec2(uv * vec2(ubo.width, ubo.height));
+    RayGenerator pg = raygenIn[int(pp.y * ubo.width + pp.x)];
+    float cdepth = length(ubo.position - rg.wpos);
+    float rel = abs(cdepth - pg.pdepth) / max(cdepth, EPS);
+    if (rel > ubo.depththreshold) return;
+    if (dot(pg.pnorm, rg.wnorm) < ubo.normalthreshold) return;
+
+    // visibility check
+    vec3 pgrgdiff = pg.pypos - rg.wpos;
+    Ray sray = { rg.wpos + (rg.wnorm * EPS), normalize(pgrgdiff) };
+    uint shitid = -1;
+    Hit shit = trace(sray, shitid);
+    if (shit.distance < length(pgrgdiff) - EPS) return;
+
+    // clamp previous frame contirbution
+    pg.pM = min(pg.pM, ubo.contributioncap);
+
+    // merge resevoirs
+    rg.M += pg.pM;
+    float w_prev = pg.pwsum;
+    rg.wsum += w_prev;
+    if (random() < w_prev / rg.wsum) {
+        rg.ypos = pg.pypos;
+        rg.ynorm = pg.pynorm;
+        rg.yradiance = pg.pyradiance;
+        rg.W = pg.pW;
+    }
+
+    raygenIn[gl_GlobalInvocationID.x] = rg;
+}
+
+void main() {
+    uint pixelCount = uint(ubo.width) * uint(ubo.height);
+    if (gl_GlobalInvocationID.x >= pixelCount) return;
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+    init_random(rx, ry);
+    temporal_merge();
+}

@@ -10,6 +10,24 @@ namespace VSTIR {
 
     struct RayGenerator {
         alignas(16) glm::vec3 accumulation;
+        alignas(16) glm::vec3 wpos;
+        alignas(16) glm::vec3 wnorm;
+        alignas(4) uint32_t matid;
+        alignas(4) uint32_t hitid;
+        alignas(16) glm::vec3 ypos;
+        alignas(16) glm::vec3 ynorm;
+        alignas(16) glm::vec3 yradiance;
+        alignas(4) float W;
+        alignas(4) float wsum;
+        alignas(4) uint32_t M;
+        alignas(16) glm::vec3 pypos;
+        alignas(16) glm::vec3 pynorm;
+        alignas(16) glm::vec3 pyradiance;
+        alignas(4) float pW;
+        alignas(4) float pwsum;
+        alignas(4) uint32_t pM;
+        alignas(4) float pdepth;
+        alignas(16) glm::vec3 pnorm;
     };
 
     typedef enum {
@@ -111,6 +129,13 @@ namespace VSTIR {
         alignas(4) float fov;
         alignas(4) float width;
         alignas(4) float height;
+        alignas(16) glm::mat4 previousvpm;
+        alignas(4) float depththreshold;
+        alignas(4) float normalthreshold;
+        alignas(4) uint32_t contributioncap;
+        alignas(4) uint32_t candidatecap;
+        alignas(4) uint32_t spacerange;
+        alignas(4) uint32_t spacecount;
     };
 
     struct VulkanSwapchain {

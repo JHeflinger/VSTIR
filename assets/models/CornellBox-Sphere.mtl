@@ -17,7 +17,7 @@ newmtl leftSphere
     Kd 1.0 1.0 1.0
     Ks 0.95 0.95 0.95
     Ns 1000
-    illum 5
+    illum 2
     
 newmtl rightSphere
     Ka 0.01 0.01 0.01
@@ -26,7 +26,7 @@ newmtl rightSphere
     Tf 0.10 0.10 0.10
     Ns 200
     Ni 2.5
-    illum 7
+    illum 2
    
 newmtl floor
     Ns 10.0000

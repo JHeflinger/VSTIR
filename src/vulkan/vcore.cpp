@@ -33,7 +33,13 @@ namespace VSTIR {
     }
 
     void VCore::InitializeShaders() {
-        m_Shaders.push_back(VSHADERS::GenerateShader("shaders/render.comp", "build/bin/shaders/render.comp.spv"));
+        #define ADDSHADER(name) m_Shaders.push_back(VSHADERS::GenerateShader(std::string("shaders/") + std::string(name) + std::string(".comp"), std::string("build/bin/shaders/") + std::string(name) + std::string(".comp.spv")))
+        ADDSHADER("render");
+        ADDSHADER("resevoir");
+        ADDSHADER("temporal");
+        ADDSHADER("spacial");
+        ADDSHADER("compile");
+        #undef ADDSHADER
     }
 
     void VCore::InitializeGeometry() {

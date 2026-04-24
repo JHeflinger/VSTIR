@@ -134,7 +134,7 @@ float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
         float tmp = ior_i;
         ior_i = ior_t;
         ior_t = tmp;
-        cosi != -1.0;
+        cosi *= -1.0;
     }
     float sint = ior_i / ior_t * sqrt(max(0.0, 1.0 - cosi * cosi));
     if (sint >= 1.0) return 1.0; // total internal reflection
@@ -325,7 +325,10 @@ vec3 compile_resevoir() {
     vec3 wi = normalize(rg.pypos - rg.wpos);
     vec3 wo = normalize(ubo.position - rg.wpos);
     vec3 brdf_cos = lambertian_throughput(wo, rg.wnorm, wi, mat);
-    return brdf_cos * rg.pyradiance * rg.pW;
+    float p_hat = luminance(brdf_cos * rg.pyradiance);
+    if (p_hat <= 0.0) return vec3(0.0);
+    float W_final = rg.pwsum / (float(rg.pM) * p_hat);
+    return brdf_cos * rg.pyradiance * W_final;
 }
 
 void main() {

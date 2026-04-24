@@ -243,19 +243,16 @@ void spacial_merge(int rx, int ry) {
         // normal similarity
         if (dot(rg.wnorm, ng.wnorm) < ubo.normalthreshold) continue;
 
-        // TODO: maybe spacial similarity would be good to do here? (check position diff)
-
-        // TODO: check for visibility - omit for now bc expensive
+        // visibility check
         vec3 ngrgdiff = ng.ypos - rg.wpos;
         Ray sray = { rg.wpos + (rg.wnorm * EPS), normalize(ngrgdiff) };
         uint shitid = -1;
         Hit shit = trace(sray, shitid);
-        if (shit.distance < length(ngrgdiff) - EPS) return;
-
+        if (shit.distance < length(ngrgdiff) - EPS) continue;
 
         // merge
         ng.M = min(ng.M, ubo.contributioncap);
-        float wN = ng.W * float(ng.M);
+        float wN = ng.wsum;
         rg.pM += ng.M;
         rg.pwsum += wN;
         if (random() < wN / rg.pwsum) {

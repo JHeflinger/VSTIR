@@ -132,7 +132,7 @@ float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
         float tmp = ior_i;
         ior_i = ior_t;
         ior_t = tmp;
-        cosi != -1.0;
+        cosi *= -1.0;
     }
     float sint = ior_i / ior_t * sqrt(max(0.0, 1.0 - cosi * cosi));
     if (sint >= 1.0) return 1.0; // total internal reflection
@@ -481,5 +481,30 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
+
+    // TODO: can probaly delete later, this is just for sanity right now
+    if (ubo.samples == 0) {
+        raygenIn[gl_GlobalInvocationID.x].accumulation = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].wpos = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].wnorm = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].matid = -1;
+        raygenIn[gl_GlobalInvocationID.x].hitid = -1;
+        raygenIn[gl_GlobalInvocationID.x].ypos = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].ynorm = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].yradiance = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].W = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].wsum = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].M = 0;
+        raygenIn[gl_GlobalInvocationID.x].pypos = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].pynorm = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].pyradiance = vec3(0);
+        raygenIn[gl_GlobalInvocationID.x].pW = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].pwsum = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].pM = 0;
+        raygenIn[gl_GlobalInvocationID.x].pdepth = 0.0;
+        raygenIn[gl_GlobalInvocationID.x].pnorm = vec3(0);
+    }
+
+
     calculate_resevoir(create_ray(vec2(rx, ry)));
 }

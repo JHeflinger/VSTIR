@@ -238,7 +238,7 @@ void temporal_merge() {
 
     // merge resevoirs
     rg.M += pg.pM;
-    float w_prev = pg.pW * float(pg.pM);
+    float w_prev = pg.pwsum;
     rg.wsum += w_prev;
     if (random() < w_prev / rg.wsum) {
         rg.ypos = pg.pypos;

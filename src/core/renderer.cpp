@@ -6,6 +6,7 @@
 #include "util/file.h"
 #include "util/bvh.h"
 #include "vulkan/vutil.h"
+#include <iostream>
 #include <vulkan/vulkan.h>
 #include <cstring>
 #include <vector>
@@ -733,9 +734,29 @@ namespace VSTIR {
         ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
         // execute shader stages
+        std::vector<int> shader_idxs;
+        if (m_settings.restir)
+        {
+            shader_idxs.push_back(1);
+            if (m_settings.temporal)
+            {
+                shader_idxs.push_back(2);
+            }
+            if (m_settings.spacial)
+            {
+                shader_idxs.push_back(3);
+            }
+            shader_idxs.push_back(4);
+        }
+        else 
+        {
+            shader_idxs.push_back(0);
+        }
+        /*
         size_t r1 = m_settings.restir ? 1 : 0;
         size_t r2 = m_settings.restir ? _shaders.size() : 1;
-        for (size_t i = r1; i < r2; i++) {
+        */
+        for (auto i : shader_idxs) {
             uint32_t invocations = _render_width * _render_height;
             vkCmdBindPipeline(
                 _scheduler.Commands().command,

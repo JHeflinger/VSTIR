@@ -691,6 +691,15 @@ namespace VSTIR {
         ImGui::Text("  ReSTIR GI:");
         ImGui::SameLine();
         ImGui::Checkbox("##restirgi", &render_settings.restir);
+        if (render_settings.restir)
+        {
+            ImGui::Text("temporal reuse");
+            ImGui::SameLine();
+            ImGui::Checkbox("##temporal reuse", &render_settings.temporal);
+            ImGui::Text("spatial reuse");
+            ImGui::SameLine();
+            ImGui::Checkbox("##spacial reuse", &render_settings.spacial);
+        }
         ImGui::Text("Depth Threshold:");
         ImGui::SameLine();
         ImGui::SliderFloat("##dthres", &render_settings.depththreshold, 0.0f, 1.0f, "%.3f");

@@ -92,6 +92,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint candidatecap;
     uint spacerange;
     uint spacecount;
+    uint buffer_idx;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -257,14 +258,14 @@ void temporal_merge() {
     pg.M = min(pg.M, ubo.contributioncap);
 
     // merge resevoirs
-    rg.pM = pg.M + 1;
-    float w_prev = pg.w_initial;
-    rg.pwsum = pg.wsum + w_prev;
+    rg.pM += pg.M;
+    float w_prev = pg.wsum;
+    rg.pwsum += pg.wsum;
     if (random() < w_prev / rg.pwsum) {
-        rg.pypos = pg.pos_initial;
-        rg.pynorm = pg.normal_initial;
-        rg.pyradiance = pg.radiance_initial;
-        rg.pW = pg.W_initial;
+        rg.pypos = pg.ypos;
+        rg.pynorm = pg.ynorm;
+        rg.pyradiance = pg.yradiance;
+        rg.pW = pg.W;
     }
 
     raygenIn[gl_GlobalInvocationID.x] = rg;

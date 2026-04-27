@@ -93,6 +93,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint candidatecap;
     uint spacerange;
     uint spacecount;
+    uint buffer_idx;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {

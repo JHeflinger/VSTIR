@@ -20,6 +20,8 @@ namespace VSTIR {
 
         bool denoiser = false; // TODO implement
         bool restir = false;
+        bool spacial = false;
+        bool temporal = false;
 
         float depththreshold = 0.03f;
         float normalthreshold = 0.95f;

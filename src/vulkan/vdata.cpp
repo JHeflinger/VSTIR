@@ -3,6 +3,7 @@
 #include "core/get.h"
 #include "util/log.h"
 #include <cstring>
+#include <iostream>
 #include <random>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -176,6 +177,7 @@ namespace VSTIR {
         ubo.candidatecap = (uint32_t)render_settings.candidatecap;
         ubo.spacerange = (uint32_t)render_settings.spacerange;
         ubo.spacecount = (uint32_t)render_settings.spacecount;
+        ubo.buffer_idx = (!render_settings.spacial && render_settings.temporal);
 
         // Camera
         ubo.fov = glm::radians(_renderer.GetCamera().Fov());

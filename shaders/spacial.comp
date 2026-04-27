@@ -283,7 +283,7 @@ void spacial_merge(int rx, int ry) {
         if (shit.distance < length(ngrgdiff) - EPS) continue;
 
         // merge
-       // ng.M = min(ng.M, ubo.contributioncap);
+        ng.pM = min(ng.pM, ubo.contributioncap);
         float wN = ng.pwsum;
         rg.M += ng.pM;
         rg.wsum += wN;

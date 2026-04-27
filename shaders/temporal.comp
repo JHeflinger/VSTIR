@@ -254,13 +254,13 @@ void temporal_merge() {
     // clamp previous frame contirbution
 
 
-    //pg.pM = min(pg.pM, ubo.contributioncap);
+    pg.M = min(pg.M, ubo.contributioncap);
 
     // merge resevoirs
     rg.pM = pg.M + 1;
     float w_prev = pg.w_initial;
     rg.pwsum = pg.wsum + w_prev;
-    if (random() < w_prev / rg.wsum) {
+    if (random() < w_prev / rg.pwsum) {
         rg.pypos = pg.pos_initial;
         rg.pynorm = pg.normal_initial;
         rg.pyradiance = pg.radiance_initial;

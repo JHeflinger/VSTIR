@@ -71,6 +71,11 @@ struct RayGenerator {
     uint pM;
     float pdepth;
     vec3 pnorm;
+    float w_initial;
+    vec3 pos_initial;
+    vec3 normal_initial;
+    vec3 radiance_initial;
+    float W_initial;
 };
 
 layout(binding = 0) uniform UniformBufferObject {

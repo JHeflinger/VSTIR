@@ -71,6 +71,11 @@ struct RayGenerator {
     uint pM;
     float pdepth;
     vec3 pnorm;
+    float w_initial;
+    vec3 pos_initial;
+    vec3 normal_initial;
+    vec3 radiance_initial;
+    float W_initial;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -321,14 +326,14 @@ vec3 compile_resevoir() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
     Material mat = materialIn[rg.matid];
     if (rg.hitid == -1 || mat.model == MIRROR_MODEL || mat.model == DIELECTRIC_MODEL) return vec3(0.0);
-    if (rg.pM == 0u || rg.pW <= 0.0) return vec3(0.0);
-    vec3 wi = normalize(rg.pypos - rg.wpos);
+    if (rg.M == 0u || rg.W <= 0.0) return vec3(0.0);
+    vec3 wi = normalize(rg.ypos - rg.wpos);
     vec3 wo = normalize(ubo.position - rg.wpos);
     vec3 brdf_cos = lambertian_throughput(wo, rg.wnorm, wi, mat);
-    float p_hat = luminance(brdf_cos * rg.pyradiance);
+    float p_hat = luminance(brdf_cos * rg.yradiance);
     if (p_hat <= 0.0) return vec3(0.0);
-    float W_final = rg.pwsum / (float(rg.pM) * p_hat);
-    return brdf_cos * rg.pyradiance * W_final;
+    float W_final = rg.wsum / (float(rg.M) * p_hat);
+    return brdf_cos * rg.yradiance * W_final;
 }
 
 void main() {

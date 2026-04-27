@@ -28,6 +28,11 @@ namespace VSTIR {
         alignas(4) uint32_t pM;
         alignas(4) float pdepth;
         alignas(16) glm::vec3 pnorm;
+        alignas(4) float w_initial;
+        alignas(16) glm::vec3 pos_initial;
+        alignas(16) glm::vec3 normal_initial;
+        alignas(16) glm::vec3 radiance_initial;
+        alignas(4) float W_initial;
     };
 
     typedef enum {

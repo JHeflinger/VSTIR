@@ -71,6 +71,11 @@ struct RayGenerator {
     uint pM;
     float pdepth;
     vec3 pnorm;
+    float w_initial;
+    vec3 pos_initial;
+    vec3 normal_initial;
+    vec3 radiance_initial;
+    float W_initial;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -470,6 +475,11 @@ void calculate_resevoir(Ray ray) {
                 rg.W = w;
             }
         }
+        rg.w_initial = rg.wsum;
+        rg.pos_initial = rg.ypos;
+        rg.normal_initial = rg.ynorm;
+        rg.radiance_initial = rg.yradiance;
+        rg.W_initial = rg.W;
     }
 
     raygenIn[gl_GlobalInvocationID.x] = rg;

@@ -53,6 +53,23 @@ struct RayGenerator {
     uint pM;
     float pdepth;
     vec3 pnorm;
+    float w_initial;
+    vec3 pos_initial;
+    vec3 normal_initial;
+    vec3 radiance_initial;
+    float W_initial;
+};
+
+struct Material {
+    vec3 emission;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    vec3 absorbtion;
+    vec3 dispersion;
+    float ior;
+    float shiny;
+    uint model;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -93,7 +110,11 @@ layout(binding = 4) readonly buffer VertexSSBOIn {
     vec3 vertexIn[ ];
 };
 
-layout(binding = 5) buffer RayGeneratorSSBOIn {
+layout(binding = 5) readonly buffer MaterialsSSBOIn {
+    Material materialIn[ ];
+};
+
+layout(binding = 6) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
@@ -210,6 +231,15 @@ Hit trace(Ray ray, inout uint hit_id) {
     return hit;
 }
 
+vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
+    return ((material.diffuse / PI) +
+        (material.specular * (material.shiny + 2.0) /
+        (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
+        max(0.0, dot(incoming, normal));
+}
+float luminance(vec3 c) {
+    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+}
 void temporal_merge() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
 
@@ -221,30 +251,20 @@ void temporal_merge() {
     if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1) return;
     ivec2 pp = ivec2(uv * vec2(ubo.width, ubo.height));
     RayGenerator pg = raygenIn[int(pp.y * ubo.width + pp.x)];
-    float cdepth = length(ubo.position - rg.wpos);
-    float rel = abs(cdepth - pg.pdepth) / max(cdepth, EPS);
-    if (rel > ubo.depththreshold) return;
-    if (dot(pg.pnorm, rg.wnorm) < ubo.normalthreshold) return;
-
-    // visibility check
-    vec3 pgrgdiff = pg.pypos - rg.wpos;
-    Ray sray = { rg.wpos + (rg.wnorm * EPS), normalize(pgrgdiff) };
-    uint shitid = -1;
-    Hit shit = trace(sray, shitid);
-    if (shit.distance < length(pgrgdiff) - EPS) return;
-
     // clamp previous frame contirbution
-    pg.pM = min(pg.pM, ubo.contributioncap);
+
+
+    //pg.pM = min(pg.pM, ubo.contributioncap);
 
     // merge resevoirs
-    rg.M += pg.pM;
-    float w_prev = pg.pwsum;
-    rg.wsum += w_prev;
+    rg.pM = pg.M + 1;
+    float w_prev = pg.w_initial;
+    rg.pwsum = pg.wsum + w_prev;
     if (random() < w_prev / rg.wsum) {
-        rg.ypos = pg.pypos;
-        rg.ynorm = pg.pynorm;
-        rg.yradiance = pg.pyradiance;
-        rg.W = pg.pW;
+        rg.pypos = pg.pos_initial;
+        rg.pynorm = pg.normal_initial;
+        rg.pyradiance = pg.radiance_initial;
+        rg.pW = pg.W_initial;
     }
 
     raygenIn[gl_GlobalInvocationID.x] = rg;

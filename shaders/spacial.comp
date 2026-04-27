@@ -53,6 +53,24 @@ struct RayGenerator {
     uint pM;
     float pdepth;
     vec3 pnorm;
+    float w_initial;
+    vec3 pos_initial;
+    vec3 normal_initial;
+    vec3 radiance_initial;
+    float W_initial;
+};
+
+
+struct Material {
+    vec3 emission;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    vec3 absorbtion;
+    vec3 dispersion;
+    float ior;
+    float shiny;
+    uint model;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -93,7 +111,10 @@ layout(binding = 4) readonly buffer VertexSSBOIn {
     vec3 vertexIn[ ];
 };
 
-layout(binding = 5) buffer RayGeneratorSSBOIn {
+layout(binding = 5) readonly buffer MaterialsSSBOIn {
+    Material materialIn[ ];
+};
+layout(binding = 6) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
@@ -210,6 +231,16 @@ Hit trace(Ray ray, inout uint hit_id) {
     return hit;
 }
 
+vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
+    return ((material.diffuse / PI) +
+        (material.specular * (material.shiny + 2.0) /
+        (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
+        max(0.0, dot(incoming, normal));
+}
+float luminance(vec3 c) {
+    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+}
+
 void spacial_merge(int rx, int ry) {
     #define rg raygenIn[gl_GlobalInvocationID.x]
 
@@ -228,6 +259,7 @@ void spacial_merge(int rx, int ry) {
     rg.pdepth = depth;
     rg.pnorm = rg.wnorm;
 
+
     // loop through and look for spacial samples
     for (uint i = 0; i < ubo.spacecount; i++) {
         // get a random coord from within range
@@ -244,21 +276,21 @@ void spacial_merge(int rx, int ry) {
         if (dot(rg.wnorm, ng.wnorm) < ubo.normalthreshold) continue;
 
         // visibility check
-        vec3 ngrgdiff = ng.ypos - rg.wpos;
+        vec3 ngrgdiff = ng.pypos - rg.wpos;
         Ray sray = { rg.wpos + (rg.wnorm * EPS), normalize(ngrgdiff) };
         uint shitid = -1;
         Hit shit = trace(sray, shitid);
         if (shit.distance < length(ngrgdiff) - EPS) continue;
 
         // merge
-        ng.M = min(ng.M, ubo.contributioncap);
-        float wN = ng.wsum;
-        rg.pM += ng.M;
-        rg.pwsum += wN;
+       // ng.M = min(ng.M, ubo.contributioncap);
+        float wN = ng.pwsum;
+        rg.M += ng.pM;
+        rg.wsum += wN;
         if (random() < wN / rg.pwsum) {
-            rg.pypos = ng.ypos;
-            rg.pyradiance = ng.yradiance;
-            rg.pW = ng.W;
+            rg.ypos = ng.pypos;
+            rg.yradiance = ng.pyradiance;
+            rg.W = ng.pW;
         }
     }
 }
@@ -269,5 +301,5 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
-    spacial_merge(rx, ry);
+   // spacial_merge(rx, ry);
 }

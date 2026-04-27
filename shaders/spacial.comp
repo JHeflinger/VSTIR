@@ -301,5 +301,5 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
-   // spacial_merge(rx, ry);
+    spacial_merge(rx, ry);
 }

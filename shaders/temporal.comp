@@ -257,10 +257,10 @@ void temporal_merge() {
 
     pg.M = min(pg.M, ubo.contributioncap);
 
-    // merge resevoirs
+    // update resevoirs
     rg.pM += pg.M;
     float w_prev = pg.wsum;
-    rg.pwsum += pg.wsum;
+    rg.pwsum += w_prev;
     if (random() < w_prev / rg.pwsum) {
         rg.pypos = pg.ypos;
         rg.pynorm = pg.ynorm;

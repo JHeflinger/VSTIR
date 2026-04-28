@@ -53,24 +53,29 @@ struct Material {
 
 struct RayGenerator {
     vec3 accumulation;
-    vec3 wpos;
-    vec3 wnorm;
-    uint matid;
-    uint hitid;
-    vec3 ypos;
-    vec3 ynorm;
-    vec3 yradiance;
-    float W;
-    float wsum;
-    uint M;
-    vec3 pypos;
-    vec3 pynorm;
-    vec3 pyradiance;
-    float pW;
-    float pwsum;
-    uint pM;
-    float pdepth;
-    vec3 pnorm;
+    vec3 initial_x_v;
+    vec3 initial_n_v;
+    vec3 initial_x_s;
+    vec3 initial_n_s;
+    vec3 initial_Lo;
+    float initial_pdf;
+    uint initial_mat;
+    vec3 temporal_x_v;
+    vec3 temporal_n_v;
+    vec3 temporal_x_s;
+    vec3 temporal_n_s;
+    vec3 temporal_Lo;
+    float temporal_w;
+    uint temporal_M;
+    float temporal_W;
+    vec3 spacial_x_v;
+    vec3 spacial_n_v;
+    vec3 spacial_x_s;
+    vec3 spacial_n_s;
+    vec3 spacial_Lo;
+    float spacial_w;
+    uint spacial_M;
+    float spacial_W;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -420,7 +425,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
     }
     return radiance;
 }
-
+/*
 void calculate_resevoir(Ray ray) {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
 
@@ -428,7 +433,7 @@ void calculate_resevoir(Ray ray) {
     rg.hitid = -1;
     Hit h = trace(ray, rg.hitid);
     if (h.distance >= 0.0f) {
-        rg.wpos = ray.position + (ray.direction * h.distance);
+        rg.wpos = h.position; // x_v
         rg.wnorm = h.normal;
         rg.matid = h.material;
 
@@ -446,12 +451,12 @@ void calculate_resevoir(Ray ray) {
             if (pdf <= 0) continue;
 
             // calculate total path
-            Ray secondary;
-            secondary.position = h.position + (incoming * EPS);
+         Ray secondary;
+            secondary.position = h.position + (h.normal * EPS);
             secondary.direction = incoming;
             uint hid = -1;
             float hdist = -1.0f;
-            vec3 Li = pathtrace(secondary, hid, hdist);
+            vec3 Li = pathtrace(secondary, hid, hdist); // Li(x_s, w_o)
 
             // compute weight
             float w = luminance(f * Li) / pdf;
@@ -463,15 +468,49 @@ void calculate_resevoir(Ray ray) {
 
             // update latest secondary hit
             if (random() < w / rg.wsum) {
-                Hit h2 = trace(secondary, hid); //WARN: there's definitely a more efficient way to do this outside of redoing an entire trace
-                rg.ypos = h2.position;
+                Hit h2 = trace(secondary, hid);
+                rg.ypos = h2.position; // x_s
                 rg.ynorm = h2.normal;
                 rg.yradiance = Li;
-                rg.W = w;
+                rg.W = rg.wsum / rg.M;
             }
         }
     }
 
+    raygenIn[gl_GlobalInvocationID.x] = rg;
+}*/
+
+void initialize_sample(int rx, int ry) {
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    Ray initial_ray = create_ray(vec2(rx, ry));
+    uint hitid = -1;
+    Hit h = trace(initial_ray, hitid);
+    if (h.distance >= 0.0) {
+        rg.initial_x_v = h.position;
+        rg.initial_n_v = h.normal;
+        vec3 wi, f;
+        float pdf;
+        float ior = 1.0;
+        uint medium = -1;
+        int wavelength = -1;
+        rg.initial_mat = h.material;
+        brdf(-initial_ray.direction, initial_ray.position, h, materialIn[h.material], wi, pdf, f, ior, medium, wavelength);
+        Ray secondary = { h.position + (h.normal) * EPS, wi };
+        hitid = -1;
+        float hdist = -1.0f;
+        rg.initial_pdf = pdf;
+        rg.initial_Lo = pathtrace(secondary, hitid, hdist);
+        Hit h2 = trace(secondary, hitid);
+        rg.initial_x_s = h2.position;
+        rg.initial_n_s = h2.normal;
+    } else {
+        rg.initial_mat = 0;
+        rg.initial_x_v = vec3(0.0);
+        rg.initial_n_v = vec3(0.0);
+        rg.initial_x_s = vec3(0.0);
+        rg.initial_n_s = vec3(0.0);
+        rg.initial_Lo = vec3(0.0);
+    }
     raygenIn[gl_GlobalInvocationID.x] = rg;
 }
 
@@ -481,30 +520,6 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
-
-    // TODO: can probaly delete later, this is just for sanity right now
-    if (ubo.samples == 0) {
-        raygenIn[gl_GlobalInvocationID.x].accumulation = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].wpos = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].wnorm = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].matid = -1;
-        raygenIn[gl_GlobalInvocationID.x].hitid = -1;
-        raygenIn[gl_GlobalInvocationID.x].ypos = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].ynorm = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].yradiance = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].W = 0.0;
-        raygenIn[gl_GlobalInvocationID.x].wsum = 0.0;
-        raygenIn[gl_GlobalInvocationID.x].M = 0;
-        raygenIn[gl_GlobalInvocationID.x].pypos = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].pynorm = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].pyradiance = vec3(0);
-        raygenIn[gl_GlobalInvocationID.x].pW = 0.0;
-        raygenIn[gl_GlobalInvocationID.x].pwsum = 0.0;
-        raygenIn[gl_GlobalInvocationID.x].pM = 0;
-        raygenIn[gl_GlobalInvocationID.x].pdepth = 0.0;
-        raygenIn[gl_GlobalInvocationID.x].pnorm = vec3(0);
-    }
-
-
-    calculate_resevoir(create_ray(vec2(rx, ry)));
+    initialize_sample(rx, ry);
+    // TODO: reset resevoir accumulations somewhere under some condition
 }

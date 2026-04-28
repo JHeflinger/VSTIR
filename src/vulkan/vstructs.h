@@ -10,24 +10,29 @@ namespace VSTIR {
 
     struct RayGenerator {
         alignas(16) glm::vec3 accumulation;
-        alignas(16) glm::vec3 wpos;
-        alignas(16) glm::vec3 wnorm;
-        alignas(4) uint32_t matid;
-        alignas(4) uint32_t hitid;
-        alignas(16) glm::vec3 ypos;
-        alignas(16) glm::vec3 ynorm;
-        alignas(16) glm::vec3 yradiance;
-        alignas(4) float W;
-        alignas(4) float wsum;
-        alignas(4) uint32_t M;
-        alignas(16) glm::vec3 pypos;
-        alignas(16) glm::vec3 pynorm;
-        alignas(16) glm::vec3 pyradiance;
-        alignas(4) float pW;
-        alignas(4) float pwsum;
-        alignas(4) uint32_t pM;
-        alignas(4) float pdepth;
-        alignas(16) glm::vec3 pnorm;
+        alignas(16) glm::vec3 initial_x_v;
+        alignas(16) glm::vec3 initial_n_v;
+        alignas(16) glm::vec3 initial_x_s;
+        alignas(16) glm::vec3 initial_n_s;
+        alignas(16) glm::vec3 initial_Lo;
+        alignas(4) float initial_pdf;
+        alignas(4) uint32_t initial_mat;
+        alignas(16) glm::vec3 temporal_x_v;
+        alignas(16) glm::vec3 temporal_n_v;
+        alignas(16) glm::vec3 temporal_x_s;
+        alignas(16) glm::vec3 temporal_n_s;
+        alignas(16) glm::vec3 temporal_Lo;
+        alignas(4) float temporal_w;
+        alignas(4) uint32_t temporal_M;
+        alignas(4) float temporal_W;
+        alignas(16) glm::vec3 spacial_x_v;
+        alignas(16) glm::vec3 spacial_n_v;
+        alignas(16) glm::vec3 spacial_x_s;
+        alignas(16) glm::vec3 spacial_n_s;
+        alignas(16) glm::vec3 spacial_Lo;
+        alignas(4) float spacial_w;
+        alignas(4) uint32_t spacial_M;
+        alignas(4) float spacial_W;
     };
 
     typedef enum {

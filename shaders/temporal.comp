@@ -33,26 +33,43 @@ struct Hit {
     vec3 position;
 };
 
+struct Material {
+    vec3 emission;
+    vec3 ambient;
+    vec3 diffuse;
+    vec3 specular;
+    vec3 absorbtion;
+    vec3 dispersion;
+    float ior;
+    float shiny;
+    uint model;
+};
+
 struct RayGenerator {
     vec3 accumulation;
-    vec3 wpos;
-    vec3 wnorm;
-    uint matid;
-    uint hitid;
-    vec3 ypos;
-    vec3 ynorm;
-    vec3 yradiance;
-    float W;
-    float wsum;
-    uint M;
-    vec3 pypos;
-    vec3 pynorm;
-    vec3 pyradiance;
-    float pW;
-    float pwsum;
-    uint pM;
-    float pdepth;
-    vec3 pnorm;
+    vec3 initial_x_v;
+    vec3 initial_n_v;
+    vec3 initial_x_s;
+    vec3 initial_n_s;
+    vec3 initial_Lo;
+    float initial_pdf;
+    uint initial_mat;
+    vec3 temporal_x_v;
+    vec3 temporal_n_v;
+    vec3 temporal_x_s;
+    vec3 temporal_n_s;
+    vec3 temporal_Lo;
+    float temporal_w;
+    uint temporal_M;
+    float temporal_W;
+    vec3 spacial_x_v;
+    vec3 spacial_n_v;
+    vec3 spacial_x_s;
+    vec3 spacial_n_s;
+    vec3 spacial_Lo;
+    float spacial_w;
+    uint spacial_M;
+    float spacial_W;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -95,6 +112,10 @@ layout(binding = 4) readonly buffer VertexSSBOIn {
 
 layout(binding = 5) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
+};
+
+layout(binding = 6) readonly buffer MaterialsSSBOIn {
+    Material materialIn[ ];
 };
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
@@ -210,43 +231,46 @@ Hit trace(Ray ray, inout uint hit_id) {
     return hit;
 }
 
-void temporal_merge() {
+vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
+    return ((material.diffuse / PI) +
+        (material.specular * (material.shiny + 2.0) /
+        (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
+        max(0.0, dot(incoming, normal));
+}
+
+float luminance(vec3 c) {
+    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+}
+
+float diffuse_pdf(vec3 normal, vec3 incoming) {
+    return max(0.0, dot(normal, incoming)) / PI;
+}
+
+float specular_pdf(vec3 incoming, vec3 R, float shiny) {
+    float cosalpha = max(dot(R, incoming), 0.0);
+    return (shiny + 1.0) * pow(cosalpha, shiny) / (2.0 * PI);
+}
+
+float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal) { //TODO: this does not consider specular lobe, fix later
+    return diffuse_pdf(normal, incoming);
+}
+
+void temporal_resample() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
-
-    // reproject onto previous camera coordinate
-    vec4 clip = ubo.previousvpm * vec4(rg.wpos, 1.0);
-    if (clip.w <= 0) return;
-    vec3 ndc = clip.xyz / clip.w;
-    vec2 uv = vec2(ndc.x * 0.5 + 0.5, ndc.y * 0.5 + 0.5);
-    if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1) return;
-    ivec2 pp = ivec2(uv * vec2(ubo.width, ubo.height));
-    RayGenerator pg = raygenIn[int(pp.y * ubo.width + pp.x)];
-    float cdepth = length(ubo.position - rg.wpos);
-    float rel = abs(cdepth - pg.pdepth) / max(cdepth, EPS);
-    if (rel > ubo.depththreshold) return;
-    if (dot(pg.pnorm, rg.wnorm) < ubo.normalthreshold) return;
-
-    // visibility check
-    vec3 pgrgdiff = pg.pypos - rg.wpos;
-    Ray sray = { rg.wpos + (rg.wnorm * EPS), normalize(pgrgdiff) };
-    uint shitid = -1;
-    Hit shit = trace(sray, shitid);
-    if (shit.distance < length(pgrgdiff) - EPS) return;
-
-    // clamp previous frame contirbution
-    pg.pM = min(pg.pM, ubo.contributioncap);
-
-    // merge resevoirs
-    rg.M += pg.pM;
-    float w_prev = pg.pwsum;
-    rg.wsum += w_prev;
-    if (random() < w_prev / rg.wsum) {
-        rg.ypos = pg.pypos;
-        rg.ynorm = pg.pynorm;
-        rg.yradiance = pg.pyradiance;
-        rg.W = pg.pW;
+    float phat = luminance(rg.initial_Lo); // WARN: maybe need to consider a pdf here further
+    float w = phat / rg.initial_pdf;
+    rg.temporal_w += w;
+    rg.temporal_M += 1;
+    if (random() < w / rg.temporal_w) {
+        rg.temporal_x_v = rg.initial_x_v;
+        rg.temporal_n_v = rg.initial_n_v;
+        rg.temporal_x_s = rg.initial_x_s;
+        rg.temporal_n_s = rg.initial_n_s;
+        rg.temporal_Lo = rg.initial_Lo;
+        // WARN: make sure we don't need to also copy over the initial pdf
     }
-
+    float phat_z = luminance(rg.temporal_Lo); // WARN: if phat needs to consider a pdf more then do it here too
+    rg.temporal_W = rg.temporal_w / (float(rg.temporal_M) * phat_z);
     raygenIn[gl_GlobalInvocationID.x] = rg;
 }
 
@@ -256,5 +280,5 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
-    temporal_merge();
+    temporal_resample();
 }

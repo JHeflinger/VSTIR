@@ -53,24 +53,29 @@ struct Material {
 
 struct RayGenerator {
     vec3 accumulation;
-    vec3 wpos;
-    vec3 wnorm;
-    uint matid;
-    uint hitid;
-    vec3 ypos;
-    vec3 ynorm;
-    vec3 yradiance;
-    float W;
-    float wsum;
-    uint M;
-    vec3 pypos;
-    vec3 pynorm;
-    vec3 pyradiance;
-    float pW;
-    float pwsum;
-    uint pM;
-    float pdepth;
-    vec3 pnorm;
+    vec3 initial_x_v;
+    vec3 initial_n_v;
+    vec3 initial_x_s;
+    vec3 initial_n_s;
+    vec3 initial_Lo;
+    float initial_pdf;
+    uint initial_mat;
+    vec3 temporal_x_v;
+    vec3 temporal_n_v;
+    vec3 temporal_x_s;
+    vec3 temporal_n_s;
+    vec3 temporal_Lo;
+    float temporal_w;
+    uint temporal_M;
+    float temporal_W;
+    vec3 spacial_x_v;
+    vec3 spacial_n_v;
+    vec3 spacial_x_s;
+    vec3 spacial_n_s;
+    vec3 spacial_Lo;
+    float spacial_w;
+    uint spacial_M;
+    float spacial_W;
 };
 
 layout(binding = 0) uniform UniformBufferObject {

@@ -70,6 +70,7 @@ struct RayGenerator {
     float spacial_w;
     uint spacial_M;
     float spacial_W;
+    vec3 direct;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -93,6 +94,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacerange;
     uint spacecount;
     uint emissivecount;
+    uint directlighting;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {

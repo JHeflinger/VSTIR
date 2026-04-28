@@ -188,6 +188,7 @@ namespace VSTIR {
 
         // emissives
         ubo.emissivecount = _renderer.GetGeometry().emissives.size();
+        ubo.directlighting = render_settings.directlighting ? 1 : 0;
 
         // View matrix
         static glm::mat4 vpm;

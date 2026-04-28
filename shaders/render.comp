@@ -76,6 +76,7 @@ struct RayGenerator {
     float spacial_w;
     uint spacial_M;
     float spacial_W;
+    vec3 direct;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -99,6 +100,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacerange;
     uint spacecount;
     uint emissivecount;
+    uint directlighting;
 } ubo;
 
 layout(binding = 1, rgba8) uniform image2D outputImage;
@@ -511,7 +513,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
             radiance += throughput * material.emission;
             break;
         }
-        if (material.model == LAMBERTIAN_MODEL && ubo.emissivecount > 0) {
+        if (ubo.directlighting != 0 && material.model == LAMBERTIAN_MODEL && ubo.emissivecount > 0) {
             vec3 direct = sample_direct_light(-ray.direction, h, material);
             radiance += min(throughput * direct, max_contribution);
         }
@@ -527,7 +529,7 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         throughput /= p;
         ray.position = h.position + (incoming * EPS);
         ray.direction = incoming;
-        count_emission = ubo.emissivecount == 0;
+        count_emission = ubo.emissivecount == 0 || ubo.directlighting == 0;
         if (material.model != LAMBERTIAN_MODEL) count_emission = true;
     }
     return radiance;

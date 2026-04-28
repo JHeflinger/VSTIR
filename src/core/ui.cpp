@@ -688,28 +688,6 @@ namespace VSTIR {
         ImGui::SameLine();
         ImGui::Checkbox("##accum", &render_settings.accumulate_samples);
 
-        ImGui::Text("  ReSTIR GI:");
-        ImGui::SameLine();
-        ImGui::Checkbox("##restirgi", &render_settings.restir);
-        ImGui::Text("Depth Threshold:");
-        ImGui::SameLine();
-        ImGui::SliderFloat("##dthres", &render_settings.depththreshold, 0.0f, 1.0f, "%.3f");
-        ImGui::Text("Normal Threshold:");
-        ImGui::SameLine();
-        ImGui::SliderFloat("##nthres", &render_settings.normalthreshold, 0.0f, 1.0f, "%.3f");
-        ImGui::Text("Contribution Cap:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##ccap", &render_settings.contributioncap, 1, 100);
-        ImGui::Text("Candidate Cap:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##cancap", &render_settings.candidatecap, 1, 10);
-        ImGui::Text("Spacial Sampling Range:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##ssrange", &render_settings.spacerange, 1, 100);
-        ImGui::Text("Spacial Sampling Count:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##sscount", &render_settings.spacecount, 1, 20);
-
         if (render_settings.accumulate_samples) {
             ImGui::SameLine();
             ImGui::Text("  Frames: %d", render_settings.sample_count);
@@ -719,7 +697,30 @@ namespace VSTIR {
             }
         }
 
-
+        ImGui::Text("  ReSTIR GI:");
+        ImGui::SameLine();
+        ImGui::Checkbox("##restirgi", &render_settings.restir);
+        ImGui::Text("  Depth Threshold:");
+        ImGui::SameLine();
+        ImGui::SliderFloat("##dthres", &render_settings.depththreshold, 0.0f, 1.0f, "%.3f");
+        ImGui::Text("  Normal Threshold:");
+        ImGui::SameLine();
+        ImGui::SliderFloat("##nthres", &render_settings.normalthreshold, 0.0f, 1.0f, "%.3f");
+        ImGui::Text("  Contribution Cap:");
+        ImGui::SameLine();
+        ImGui::SliderInt("##ccap", &render_settings.contributioncap, 1, 100);
+        ImGui::Text("  Candidate Cap:");
+        ImGui::SameLine();
+        ImGui::SliderInt("##cancap", &render_settings.candidatecap, 1, 10);
+        ImGui::Text("  Spacial Sampling Range:");
+        ImGui::SameLine();
+        ImGui::SliderInt("##ssrange", &render_settings.spacerange, 1, 100);
+        ImGui::Text("  Spacial Sampling Count:");
+        ImGui::SameLine();
+        ImGui::SliderInt("##sscount", &render_settings.spacecount, 1, 20);
+        ImGui::Text("  NEE:");
+        ImGui::SameLine();
+        ImGui::Checkbox("##nee", &render_settings.directlighting);
 
         ImGui::Spacing();
     }

@@ -94,6 +94,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacerange;
     uint spacecount;
     uint buffer_idx;
+    float denoise_bias;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {

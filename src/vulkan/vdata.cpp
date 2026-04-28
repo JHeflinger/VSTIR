@@ -188,6 +188,8 @@ namespace VSTIR {
         ubo.u = glm::normalize(glm::cross(ubo.up, ubo.w));
         ubo.v = glm::normalize(glm::cross(ubo.w, ubo.u));
 
+        // denoise
+        ubo.denoise_bias = render_settings.denoise_bias;
         // View matrix
         static glm::mat4 vpm;
         static bool first_vpm = true;

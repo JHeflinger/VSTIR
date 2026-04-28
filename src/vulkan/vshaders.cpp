@@ -33,7 +33,18 @@ namespace VSTIR {
     			},
     			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
     		};
-        } else if (strcmp(name, "UniformBufferObject") == 0) {
+        } 
+        else if (strcmp(name, "inputImage") == 0) {
+    		return (VulkanBoundVariable) {
+    			STORAGE_IMAGE,
+    			(SchrodingRef) {
+    				true,
+    				&(_context.Target().view)
+    			},
+    			(SchrodingSize) { (SchrodingRef) { 0 }, 0, 0 }
+    		};
+        }
+        else if (strcmp(name, "UniformBufferObject") == 0) {
     		return (VulkanBoundVariable) {
     			UNIFORM_BUFFER,
     			(SchrodingRef) {

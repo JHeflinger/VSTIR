@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
+#include <vulkan/vulkan_core.h>
 
 namespace VSTIR {
 
@@ -142,6 +143,7 @@ namespace VSTIR {
         alignas(4) uint32_t spacerange;
         alignas(4) uint32_t spacecount;
         alignas(4) uint32_t buffer_idx;
+        alignas(4) float denoise_bias;
     };
 
     struct VulkanSwapchain {

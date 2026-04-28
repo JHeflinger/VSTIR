@@ -25,6 +25,7 @@ namespace VSTIR {
 
         float depththreshold = 0.03f;
         float normalthreshold = 0.95f;
+        float denoise_bias = 0.;
         int contributioncap = 20;
         int candidatecap = 2;
         int spacerange = 5;

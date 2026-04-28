@@ -752,10 +752,11 @@ namespace VSTIR {
         {
             shader_idxs.push_back(0);
         }
-        /*
-        size_t r1 = m_settings.restir ? 1 : 0;
-        size_t r2 = m_settings.restir ? _shaders.size() : 1;
-        */
+        if (m_settings.denoiser)
+        {
+            shader_idxs.push_back(5);
+        }
+        
         for (auto i : shader_idxs) {
             uint32_t invocations = _render_width * _render_height;
             vkCmdBindPipeline(
@@ -771,7 +772,9 @@ namespace VSTIR {
                 &(_data.Descriptors()[i].set),
                 0,
                 nullptr);
-            vkCmdDispatch(_scheduler.Commands().command, WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE), 1, 1);
+            int x = (i != 5) * WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE) + (i==5) * (WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE>>1));
+            int y = (i != 5) + (i==5) * (WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE>>1));
+            vkCmdDispatch(_scheduler.Commands().command, x, y, 1);
             VUTILS::RecordGeneralBarrier(_scheduler.Commands().command);
         }
 

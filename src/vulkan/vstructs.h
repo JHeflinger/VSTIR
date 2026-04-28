@@ -141,6 +141,7 @@ namespace VSTIR {
         alignas(4) uint32_t candidatecap;
         alignas(4) uint32_t spacerange;
         alignas(4) uint32_t spacecount;
+        alignas(4) uint32_t emissivecount;
     };
 
     struct VulkanSwapchain {

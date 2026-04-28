@@ -63,6 +63,21 @@ namespace VSTIR {
     				sizeof(Triangle)
     			}
     		};
+    	} else if (strcmp(name, "EmissivesSSBOIn") == 0) {
+    		return (VulkanBoundVariable) {
+    			STORAGE_BUFFER,
+    			(SchrodingRef) {
+    				true,
+    				&(_core.Geometry().emissives.buffer)
+    			},
+    			(SchrodingSize) {
+    				(SchrodingRef) {
+    					true,
+    					&(_renderer.GetGeometry().emissives_size)
+    				}, 0.0f,
+    				sizeof(uint32_t)
+    			}
+    		};
     	} else if (strcmp(name, "VertexSSBOIn") == 0) {
     		return (VulkanBoundVariable) {
     			STORAGE_BUFFER,

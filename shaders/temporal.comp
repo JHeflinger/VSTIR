@@ -92,6 +92,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint candidatecap;
     uint spacerange;
     uint spacecount;
+    uint emissivecount;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -257,7 +258,8 @@ float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal) { //TOD
 
 void temporal_resample() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
-    float phat = luminance(rg.initial_Lo); // WARN: maybe need to consider a pdf here further
+    float phat = luminance(rg.initial_Lo);
+    if (rg.initial_pdf == 0) return;
     float w = phat / rg.initial_pdf;
     rg.temporal_w += w;
     rg.temporal_M += 1;
@@ -267,9 +269,8 @@ void temporal_resample() {
         rg.temporal_x_s = rg.initial_x_s;
         rg.temporal_n_s = rg.initial_n_s;
         rg.temporal_Lo = rg.initial_Lo;
-        // WARN: make sure we don't need to also copy over the initial pdf
     }
-    float phat_z = luminance(rg.temporal_Lo); // WARN: if phat needs to consider a pdf more then do it here too
+    float phat_z = luminance(rg.temporal_Lo);
     rg.temporal_W = rg.temporal_w / (float(rg.temporal_M) * phat_z);
     raygenIn[gl_GlobalInvocationID.x] = rg;
 }

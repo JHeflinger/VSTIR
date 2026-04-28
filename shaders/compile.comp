@@ -1,7 +1,6 @@
 #version 450
 
 #define MAX_RECURSIVE_DEPTH 2000
-#define MAX_BOUNCES 100
 #define EPS 0.000001
 #define FLTMAX 3.402823466e+38
 
@@ -98,6 +97,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint candidatecap;
     uint spacerange;
     uint spacecount;
+    uint emissivecount;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -332,8 +332,9 @@ float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal, in Mate
     return (pd * diffuse_pdf(normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
 }
 
-vec3 compile_resevoir() { // TODO: use spacial resevoir not teporal
+vec3 compile_resevoir() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    if (rg.initial_pdf == 1.0) return rg.spacial_Lo;
     vec3 wi = normalize(rg.spacial_x_s - rg.spacial_x_v);
     vec3 wo = normalize(ubo.position - rg.spacial_x_v);
     vec3 brdf_cos = lambertian_throughput(wo, rg.spacial_n_v, wi, materialIn[rg.initial_mat]);

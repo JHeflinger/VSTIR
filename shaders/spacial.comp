@@ -35,24 +35,30 @@ struct Hit {
 
 struct RayGenerator {
     vec3 accumulation;
-    vec3 wpos;
-    vec3 wnorm;
-    uint matid;
-    uint hitid;
-    vec3 ypos;
-    vec3 ynorm;
-    vec3 yradiance;
-    float W;
-    float wsum;
-    uint M;
-    vec3 pypos;
-    vec3 pynorm;
-    vec3 pyradiance;
-    float pW;
-    float pwsum;
-    uint pM;
-    float pdepth;
-    vec3 pnorm;
+    vec3 initial_x_v;
+    vec3 initial_n_v;
+    vec3 initial_x_s;
+    vec3 initial_n_s;
+    vec3 initial_Lo;
+    float initial_pdf;
+    uint initial_mat;
+    vec3 temporal_x_v;
+    vec3 temporal_n_v;
+    vec3 temporal_x_s;
+    vec3 temporal_n_s;
+    vec3 temporal_Lo;
+    float temporal_w;
+    uint temporal_M;
+    float temporal_W;
+    vec3 spacial_x_v;
+    vec3 spacial_n_v;
+    vec3 spacial_x_s;
+    vec3 spacial_n_s;
+    vec3 spacial_Lo;
+    float spacial_w;
+    uint spacial_M;
+    float spacial_W;
+    vec3 direct;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -75,6 +81,8 @@ layout(binding = 0) uniform UniformBufferObject {
     uint candidatecap;
     uint spacerange;
     uint spacecount;
+    uint emissivecount;
+    uint directlighting;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -210,57 +218,74 @@ Hit trace(Ray ray, inout uint hit_id) {
     return hit;
 }
 
-void spacial_merge(int rx, int ry) {
+float luminance(vec3 c) {
+    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+}
+
+void spacial_resample(int rx, int ry) {
     #define rg raygenIn[gl_GlobalInvocationID.x]
-
-    // setup working resevoir
-    rg.pypos = rg.ypos;
-    rg.pynorm = rg.ynorm;
-    rg.pyradiance = rg.yradiance;
-    rg.pW = rg.W;
-    rg.pwsum = rg.wsum;
-    rg.pM = rg.M;
-
-    // precalculate values
-    float depth = length(rg.wpos - ubo.position);
-
-    // set norm and depth for prev temporal sampling next time
-    rg.pdepth = depth;
-    rg.pnorm = rg.wnorm;
-
-    // loop through and look for spacial samples
+    float depth = length(rg.temporal_x_v - ubo.position);
     for (uint i = 0; i < ubo.spacecount; i++) {
         // get a random coord from within range
-        int nx = rx + min(int(random() * float(ubo.spacerange)), int(ubo.spacerange) - 1) - (int(ubo.spacerange)/2); // WARN: this can end up missing out on merging if it keeps hitting rejected pixels, and can also be weirdly biased if randomly hits the same pixel multiple times
+        int nx = rx + min(int(random() * float(ubo.spacerange)), int(ubo.spacerange) - 1) - (int(ubo.spacerange)/2);
         int ny = ry + min(int(random() * float(ubo.spacerange)), int(ubo.spacerange) - 1) - (int(ubo.spacerange)/2);
         if (nx < 0 || nx >= ubo.width || ny < 0 || ny >= ubo.height) continue;
-        RayGenerator ng = raygenIn[int(ny * ubo.width + nx)];
+        int ncoord = int(ny * ubo.width + nx);
+        #define ng raygenIn[ncoord]
+
+        // hit check
+        if (ng.initial_n_v == vec3(0.0)) continue;
 
         // depth similarity
-        float ndepth = length(ng.wpos - ubo.position);
+        float ndepth = length(ng.temporal_x_v - ubo.position);
         if (abs(depth - ndepth) / depth > ubo.depththreshold) continue;
 
         // normal similarity
-        if (dot(rg.wnorm, ng.wnorm) < ubo.normalthreshold) continue;
+        if (dot(rg.temporal_n_v, ng.temporal_n_v) < ubo.normalthreshold) continue;
+
+        // calculate phat
+        float phat = luminance(ng.temporal_Lo);
 
         // visibility check
-        vec3 ngrgdiff = ng.ypos - rg.wpos;
-        Ray sray = { rg.wpos + (rg.wnorm * EPS), normalize(ngrgdiff) };
+        vec3 ngrgdiff = ng.temporal_x_s - rg.temporal_x_v;
+        Ray sray = { rg.temporal_x_v + (rg.temporal_n_v * EPS), normalize(ngrgdiff) };
         uint shitid = -1;
         Hit shit = trace(sray, shitid);
-        if (shit.distance < length(ngrgdiff) - EPS) continue;
+        if (shit.distance < length(ngrgdiff) - EPS) phat = 0;
+
+        // calculate jacobian
+        vec3 x_c = rg.initial_x_v;
+        vec3 x_n = ng.initial_x_v;
+        vec3 x_s = rg.temporal_x_s;
+        vec3 n_c = rg.initial_n_v;
+        vec3 n_n = ng.initial_n_v;
+        vec3 n_s = rg.temporal_n_v;
+        vec3 dir_c = normalize(x_s - x_c);
+        vec3 dir_n = normalize(x_s - x_n);
+        float r_c = length(x_s - x_c);
+        float r_n = length(x_s - x_n);
+        float cos_c = max(dot(n_c, dir_c), 0.0);
+        float cos_n = max(dot(n_n, dir_n), 0.0);
+        float J = (r_n * r_n) / (r_c * r_c) * (cos_c / max(cos_n, 1e-6f));
+        phat /= J;
 
         // merge
-        ng.M = min(ng.M, ubo.contributioncap);
-        float wN = ng.wsum;
-        rg.pM += ng.M;
-        rg.pwsum += wN;
-        if (random() < wN / rg.pwsum) {
-            rg.pypos = ng.ypos;
-            rg.pyradiance = ng.yradiance;
-            rg.pW = ng.W;
+        float wnew = phat * ng.temporal_W * ng.temporal_M;
+        rg.spacial_w += wnew;
+        if (random() < wnew / rg.spacial_w) {
+            rg.spacial_x_v = rg.temporal_x_v;
+            rg.spacial_n_v = rg.temporal_n_v;
+            rg.spacial_x_s = rg.temporal_x_s;
+            rg.spacial_n_s = rg.temporal_n_s;
+            rg.spacial_Lo = rg.temporal_Lo;
         }
+        rg.spacial_M += ng.temporal_M;
     }
+
+    // TODO: bias correction
+
+    float phat_z = luminance(rg.spacial_Lo);
+    rg.spacial_W = rg.spacial_w / (float(rg.spacial_M) * phat_z);
 }
 
 void main() {
@@ -269,5 +294,5 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
-    spacial_merge(rx, ry);
+    spacial_resample(rx, ry);
 }

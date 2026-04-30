@@ -558,6 +558,7 @@ namespace VSTIR {
                 state.normals.size() > 0 && state.faces[i].normals ? (uint32_t)normals_start + state.faces[i].cn : (uint32_t)-1,
                 current_material
             };
+            if (m_Geometry.materials[current_material].emission != glm::vec3(0.0f)) m_Geometry.emissives.push_back(m_Geometry.triangles.size());
             m_Geometry.triangles.push_back(triangle);
         }
         return true;

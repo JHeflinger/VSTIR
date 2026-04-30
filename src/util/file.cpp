@@ -24,6 +24,9 @@ namespace VSTIR {
             return DOTMTL;
         } else if (strcmp(extension, "xml") == 0 || strcmp(extension, "XML") == 0) {
             return DOTXML;
+        } else if (strcmp(extension, "yaml") == 0 || strcmp(extension, "YAML") == 0 ||
+                   strcmp(extension, "yml") == 0 || strcmp(extension, "YML") == 0) {
+            return DOTYAML;
         }
         return UNKNOWN;
     }

@@ -20,6 +20,7 @@ target_link_libraries(vstir PRIVATE
     Vulkan::Vulkan
     glfw
     glm::glm
+    yaml-cpp
     imgui
     GPUOpen::VulkanMemoryAllocator
     nfd

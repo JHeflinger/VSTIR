@@ -10,7 +10,8 @@ namespace VSTIR {
         DOTOBJ,
         DOTSPV,
         DOTMTL,
-        DOTXML
+        DOTXML,
+        DOTYAML
     } FileType;
 
     typedef struct {

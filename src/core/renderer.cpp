@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include "core/editor.h"
 #include "core/get.h"
+#include "core/scene_loader.h"
 #include "core/ui.h"
 #include "util/log.h"
 #include "util/file.h"
@@ -698,32 +699,9 @@ namespace VSTIR {
 
     void Renderer::LoadScene(std::string filepath) {
         vkDeviceWaitIdle(_interface);
-        SimpleFile* file = VFILE::ReadFile(filepath.c_str());
-        uint32_t startv = m_Geometry.vertices.size();
-        if (!file) FATAL("Unable to load invalid filepath \"%s\"", filepath.c_str());
-        if (file->type != DOTOBJ) FATAL("\"%s\" is not a .obj file. Unable to open it with the OBJ loader", filepath.c_str());
-        LineParser parser = VFILE::Parser(file);
-        StateOBJ state{};
-        state.filepath = std::string(filepath);
-        char line[MAX_OBJ_LINE_SIZE] = { 0 };
-        while (VFILE::NextLine(&parser, line, MAX_OBJ_LINE_SIZE)) {
-            char lineargs[MAX_OBJ_NUM_ARGS][MAX_OBJ_ARG_SIZE] = { 0 };
-            size_t numargs = ParseLineArgsOBJ(line, lineargs);
-            if (numargs > 0 && lineargs[0][0] != '#') {
-                ParseFuncOBJ p = GetParserFromArgOBJ(lineargs[0]);
-                if (p) { if (!p(lineargs, numargs, &state)) { ERROR("%s:%d - Unable to parse this OBJ field due to an error", filepath.c_str(), (int)parser.line); VFILE::FreeFile(file); return; }
-                } else WARN("%s:%d - Unknown OBJ property detected: \"%s\", skipping parsing this field...", filepath.c_str(), (int)parser.line, lineargs[0]);
-            }
+        if (!SceneLoader::LoadScene(filepath, m_Geometry)) {
+            return;
         }
-        if (!ConstructOBJ(state)) FATAL("Unable to construct .obj \"%s\" due to an error", filepath.c_str());
-        VFILE::FreeFile(file);
-        m_Geometry.bvh = BVH::Create(m_Geometry.triangles, m_Geometry.vertices);
-        m_Geometry.bvh_size = m_Geometry.bvh.size();
-        m_Geometry.vertices_size = m_Geometry.vertices.size();
-        m_Geometry.normals_size = m_Geometry.normals.size();
-        m_Geometry.triangles_size = m_Geometry.triangles.size();
-        m_Geometry.emissives_size = m_Geometry.emissives.size();
-        m_Geometry.materials_size = m_Geometry.materials.size();
         m_Backend.Reconstruct();
     }
 

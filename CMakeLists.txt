@@ -50,6 +50,22 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(yaml-cpp)
 
+# ── tinyobjloader (robust OBJ parsing) ───────────────────────────────────────
+FetchContent_Declare(
+    tinyobjloader
+    GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
+    GIT_TAG        v2.0.0rc13
+)
+FetchContent_MakeAvailable(tinyobjloader)
+
+# ── tinygltf (glTF/GLB parsing) ─────────────────────────────────────────────
+FetchContent_Declare(
+    tinygltf
+    GIT_REPOSITORY https://github.com/syoyo/tinygltf.git
+    GIT_TAG        v2.9.5
+)
+FetchContent_MakeAvailable(tinygltf)
+
 # ── Native File Dialog (cross-platform file dialogs) ───────────────────────────────────────
 FetchContent_Declare(
         nfd

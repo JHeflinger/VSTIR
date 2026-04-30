@@ -14,7 +14,11 @@ add_executable(vstir ${APP_SOURCES})
 # Shaders must compile before the app links
 add_dependencies(vstir Shaders)
 
-target_include_directories(vstir PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(vstir PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${tinyobjloader_SOURCE_DIR}
+    ${tinygltf_SOURCE_DIR}
+)
 
 target_link_libraries(vstir PRIVATE
     Vulkan::Vulkan

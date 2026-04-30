@@ -800,8 +800,8 @@ namespace VSTIR {
     // ============================================================
 
     void UI::openFileButton() {
-        if (ImGui::Button("Open Scene/OBJ...", ImVec2(-1.0f, 0.0f))) {
-            const auto s = openFileExplorer({{"OBJ Files", "obj"}, {"Scene Files", "yaml"}});
+        if (ImGui::Button("Open Scene", ImVec2(-1.0f, 0.0f))) {
+            const auto s = openFileExplorer({{"OBJ Files", "obj"}, {"GLB Files", "glb"},{"Scene Files", "yaml"}});
             if (s.empty()) return;
             INFO("Selected file: %s", s.c_str());
             Editor::LoadScene(s);

@@ -52,6 +52,7 @@ struct Material {
 };
 
 struct RayGenerator {
+    vec3 rawaccumulation;
     vec3 accumulation;
     vec3 initial_x_v;
     vec3 initial_n_v;
@@ -101,6 +102,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacecount;
     uint emissivecount;
     uint directlighting;
+    uint divider;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {

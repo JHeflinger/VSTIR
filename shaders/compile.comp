@@ -51,6 +51,7 @@ struct Material {
 };
 
 struct RayGenerator {
+    vec3 rawaccumulation;
     vec3 accumulation;
     vec3 initial_x_v;
     vec3 initial_n_v;
@@ -100,6 +101,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacecount;
     uint emissivecount;
     uint directlighting;
+    uint divider;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -126,7 +128,7 @@ layout(binding = 6) buffer RayGeneratorSSBOIn {
    RayGenerator raygenIn[ ];
 };
 
-layout(binding = 7, rgba8) uniform image2D outputImage;
+layout(binding = 7, rgba8) uniform image2D restirImage;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
@@ -357,5 +359,5 @@ void main() {
     color /= float(ubo.samples + 1);
     vec3 hdr_color = (color * ((color/20.0) + vec3(1.0)))/(vec3(1.0) + color);
     hdr_color = pow(hdr_color, vec3(1.0 / 2.2));
-	imageStore(outputImage, ivec2(rx, ry), vec4(hdr_color, 1.0));
+	imageStore(restirImage, ivec2(rx, ry), vec4(hdr_color, 1.0));
 }

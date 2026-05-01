@@ -203,6 +203,9 @@ namespace VSTIR {
             ubo.previousvpm = vpm;
         }
 
+        // divider
+        ubo.divider = _viewport_width / 2.0f;
+
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 

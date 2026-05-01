@@ -39,6 +39,7 @@ namespace VSTIR {
         ADDSHADER("temporal");
         ADDSHADER("spacial");
         ADDSHADER("compile");
+        ADDSHADER("merge");
         #undef ADDSHADER
     }
 

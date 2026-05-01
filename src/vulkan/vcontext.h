@@ -15,6 +15,8 @@ namespace VSTIR {
         void ResizeSwapchain(uint32_t width, uint32_t height);
         void ResizeTarget();
         VulkanImage& Target() { return m_Target; }
+        VulkanImage& RawTarget() { return m_RawTarget; }
+        VulkanImage& ReSTIRTarget() { return m_ReSTIRTarget; }
         VData& Data() { return m_Data; }
         VulkanPipeline& Pipeline() { return m_Pipeline; }
         VulkanSwapchain& Swapchain() { return m_Swapchain; }
@@ -28,6 +30,8 @@ namespace VSTIR {
         VulkanSwapchain m_Swapchain;
         VulkanPipeline m_Pipeline;
         VulkanImage m_Target;
+        VulkanImage m_RawTarget;
+        VulkanImage m_ReSTIRTarget;
         VData m_Data;
     };
 

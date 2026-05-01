@@ -1,0 +1,48 @@
+#version 450
+
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+    uint emissivecount;
+    uint directlighting;
+    uint divider;
+} ubo;
+
+layout(binding = 1, rgba8) uniform image2D outputImage;
+
+layout(binding = 2, rgba8) uniform image2D rawImage;
+
+layout(binding = 3, rgba8) uniform image2D restirImage;
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+    uint pixelCount = uint(ubo.width) * uint(ubo.height);
+    if (gl_GlobalInvocationID.x >= pixelCount) return;
+	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+    if (abs(int(ubo.divider) - rx) < 1) {
+        imageStore(outputImage, ivec2(rx, ry), vec4(1));
+    } else if (rx > ubo.divider) {
+        imageStore(outputImage, ivec2(rx, ry), imageLoad(rawImage, ivec2(rx, ry)));
+    } else {
+        imageStore(outputImage, ivec2(rx, ry), imageLoad(restirImage, ivec2(rx, ry)));
+    }
+}

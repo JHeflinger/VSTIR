@@ -734,9 +734,7 @@ namespace VSTIR {
         ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
         // execute shader stages
-        size_t r1 = m_settings.restir ? 1 : 0;
-        size_t r2 = m_settings.restir ? _shaders.size() : 1;
-        for (size_t i = r1; i < r2; i++) {
+        for (size_t i = 0; i < _shaders.size(); i++) {
             uint32_t invocations = _render_width * _render_height;
             vkCmdBindPipeline(
                 _scheduler.Commands().command,

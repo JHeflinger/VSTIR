@@ -6,11 +6,9 @@ denoiser bias
 ```
 where bias is any float number. Below is some sample images with different bias values
 
-| original | 0.0 | 0.2 | 0.7|
+| original | 0.0 | 0.02 | 0.07|
 | --- | --- | --- | --- |
-| ![original](./data/noise1.png) | ![no bias](./denoised_data/noise1_bias0.png) | ![bias=0.2](./denoised_data/noise1_bias0.2.png) | ![bias=0.7](./denoised_data/noise1_bias0.7.png)|
-| ![original](./data/noise2.png) | ![no bias](./denoised_data/noise2_bias0.png) | ![bias=0.2](./denoised_data/noise2_bias0.2.png) | ![bias=0.7](./denoised_data/noise2_bias0.7.png)|
-| ![original](./data/noise3.png) | ![no bias](./denoised_data/noise3_bias0.png) | ![bias=0.2](./denoised_data/noise3_bias0.2.png) | ![bias=0.7](./denoised_data/noise3_bias0.7.png)|
-
-## limitation
-only works when width and height are powers of 2.
+| ![original](./data/noise1.png) | ![no bias](./denoised_data/bias0_noise1.png) | ![bias=0.02](./denoised_data/bias0.02_noise1.png) | ![bias=0.07](./denoised_data/bias0.07_noise1.png)|
+| ![original](./data/noise2.png) | ![no bias](./denoised_data/bias0_noise2.png) | ![bias=0.02](./denoised_data/bias0.02_noise2.png) | ![bias=0.07](./denoised_data/bias0.07_noise2.png)|
+| ![original](./data/noise3.png) | ![no bias](./denoised_data/bias0_noise3.png) | ![bias=0.02](./denoised_data/bias0.02_noise3.png) | ![bias=0.07](./denoised_data/bias0.07_noise3.png)|
+| ![original](./data/cute_cat.jpg) | ![no bias](./denoised_data/bias0_cute_cat.png) | ![bias=0.02](./denoised_data/bias0.02_cute_cat.png) | ![bias=0.07](./denoised_data/bias0.07_cute_cat.png)|

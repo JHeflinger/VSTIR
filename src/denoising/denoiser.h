@@ -21,14 +21,40 @@ float estimate_sd(std::vector<float>& img, int width, int height, int stride);
 
 void soft_thresh_img(std::vector<float>& data, int w, int h, int gw, int gh, float bias);
 float soft_thresh(float v, float t);
-void denoise(std::vector<col3f>& img, int stride, float bias);
-void extract_components(std::vector<col3f>& img, 
+void denoise(std::vector<col3f>& img, int stride, float bias, bool global = false);
+void denoise_space_transform(std::vector<col3f>& img, int stride, float bias, bool global = false);
+
+void extract_components(
+        std::vector<col3f>& img, 
+        int stride_main,
+        int new_height,
+        int new_width,
         std::vector<float>& r, 
         std::vector<float>& g, 
         std::vector<float>& b
         );
 
 void combine_components(std::vector<col3f>& img, 
+        int stride_main,
+        int stride_comp,
+        std::vector<float>& r, 
+        std::vector<float>& g, 
+        std::vector<float>& b
+        );
+
+void extract_to_yspace(
+        std::vector<col3f>& img, 
+        int stride_main,
+        int new_height,
+        int new_width,
+        std::vector<float>& r, 
+        std::vector<float>& g, 
+        std::vector<float>& b
+        );
+void extract_from_yspace(
+        std::vector<col3f>& img, 
+        int stride_main,
+        int stride_comp,
         std::vector<float>& r, 
         std::vector<float>& g, 
         std::vector<float>& b

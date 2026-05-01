@@ -13,6 +13,8 @@ std::pair<int, std::vector<col3f>> load_img(std::string&& file)
     int h;
     int c;
    auto* img = stbi_load(file.c_str(), &w, &h, &c, STBI_rgb); 
+   if (img != nullptr)
+   {
    std::vector<col3f> img_f(w * h);
    for (int i = 0; i < w * h; i++)
    {
@@ -21,6 +23,8 @@ std::pair<int, std::vector<col3f>> load_img(std::string&& file)
        img_f[i].comps[2] = (float)img[3 * i + 2] / 0xff;
    }
    return {w,img_f};
+   }
+   return {-1, {}};
 }
 void write_img(const std::vector<col3f>& data, int stride,  std::string&& file)
 {
@@ -43,15 +47,47 @@ int main(int argc, char** argv)
     std::stringstream ss;
     float bias = std::stof(argv[1]) * (argc >= 2);
     ss << bias;
-    for (const auto& entry : std::filesystem::directory_iterator("./data/"))
+    std::vector<std::string> paths;
+    if (argc < 3)
     {
-        if (entry.is_directory() || !entry.path().has_filename())[[unlikely]]
+        for (const auto& entry :
+                std::filesystem::directory_iterator("./data/"))
         {
-            std::cerr<< "cannot support directories yet, skipping..." << '\n';
-            continue;
+            if (entry.is_directory() || !entry.path().has_filename())[[unlikely]]
+            {
+                std::cerr<< "cannot support directories yet, skipping..." << '\n';
+                continue;
+            }
+            paths.push_back("./data/" + std::string(entry.path().stem()) + std::string(entry.path().extension()));
         }
-        auto [stride, img] = load_img("./data/" + std::string(entry.path().stem()) + std::string(entry.path().extension()));
-        denoise(img, stride, bias);
-        write_img(img, stride, "./denoised_data/" + std::string(entry.path().stem())+ "_bias"+ ss.str() + std::string(entry.path().extension()));
     }
+    else 
+    {
+        for (int i = 2; i < argc; i++)
+        {
+            paths.push_back(std::string(argv[i]));
+        }
+    }
+        for (const auto& path: paths)
+        {
+            auto [stride, img] = load_img(std::string(path));
+            if (stride < 0)
+            {
+                continue;
+            }
+            denoise_space_transform(img, stride, bias, false);
+            int last = path.find_last_of("/");
+            if (last == std::string::npos)
+            {
+                last = 0;
+            }
+            else 
+            {
+                last += 1;
+            }
+            write_img(img, stride,
+                    "./denoised_data/bias"+ss.str()+"_" + std::string(&path[last]));
+            
+
+        }
 }

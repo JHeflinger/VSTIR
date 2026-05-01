@@ -75,7 +75,7 @@ int main(int argc, char** argv)
             {
                 continue;
             }
-            denoise_space_transform(img, stride, bias, false);
+            denoise(img, stride, bias, false);
             int last = path.find_last_of("/");
             if (last == std::string::npos)
             {

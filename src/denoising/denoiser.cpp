@@ -295,7 +295,10 @@ void combine_components(std::vector<col3f>& img,
         for (int i = 0; i < stride_main; i++)
         {
             int new_idx = j * stride_comp + i;
-            img[j * stride_main + i].set(r[new_idx], g[new_idx], b[new_idx]);
+            float rr = std::clamp(r[new_idx], 0.f, 1.f);
+            float gg= std::clamp(g[new_idx], 0.f, 1.f);
+            float bb= std::clamp(b[new_idx], 0.f, 1.f);
+            img[j * stride_main + i].set(rr, gg, bb);
         }
     }
 }

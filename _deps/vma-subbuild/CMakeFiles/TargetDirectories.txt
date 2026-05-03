@@ -1,0 +1,3 @@
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/vma-populate.dir
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/edit_cache.dir
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/rebuild_cache.dir

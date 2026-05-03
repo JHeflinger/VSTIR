@@ -1,0 +1,84 @@
+#version 450
+
+#define inv_sqrt2 0.707106
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+    uint buffer_idx;
+    float denoise_bias;
+    float max_width;
+} ubo;
+
+
+layout(binding = 1) buffer outr {
+    float rimg[ ];
+};
+
+layout(binding = 2) buffer outg {
+    float gimg[ ];
+};
+
+layout(binding = 3) buffer outb {
+    float bimg[ ];
+};
+
+layout(binding = 4, rgba8) uniform image2D outputImage;
+
+struct DenoiseOpts 
+{
+    vec3 bias;
+    vec3 median;
+    float width;
+    float height;
+    float mode;
+};
+
+layout(binding = 5) buffer DenoiseStuff {
+    DenoiseOpts opts;
+};
+
+void main()
+{
+    opts.width = ubo.width;
+    opts.height = ubo.height;
+    opts.mode = 0.5f;
+    uint pixel_count = uint(ubo.width) * uint(ubo.height);
+    if (gl_GlobalInvocationID.x >= pixel_count) 
+    {
+        return;
+    }
+    uint idxx = gl_GlobalInvocationID.x;
+    uint x = idxx % uint(ubo.width);
+    uint y = idxx / uint(ubo.width);
+    uint stride = uint(ubo.max_width);
+    uint idx = y * stride + x;
+    vec4 
+        rgba = vec4(
+            clamp(rimg[idx], 0., 1.), 
+            clamp(gimg[idx], 0., 1.), 
+            clamp(bimg[idx], 0., 1.), 1.);
+    imageStore(
+            outputImage, 
+            ivec2(x, y), 
+            rgba
+            );
+}

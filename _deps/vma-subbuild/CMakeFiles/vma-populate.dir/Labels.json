@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/vma-populate"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/vma-populate.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/vma-populate-complete.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-build.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-configure.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-download.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-install.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-mkdir.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-patch.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-test.rule"
+		},
+		{
+			"file" : "/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"vma-populate"
+		],
+		"name" : "vma-populate"
+	}
+}

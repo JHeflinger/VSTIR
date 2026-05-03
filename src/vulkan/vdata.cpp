@@ -1,7 +1,9 @@
 #include "vdata.h"
+#include "vstructs.h"
 #include "vulkan/vutil.h"
 #include "core/get.h"
 #include "util/log.h"
+#include <cmath>
 #include <cstring>
 #include <iostream>
 #include <random>
@@ -19,9 +21,87 @@ namespace VSTIR {
 
     void VData::Initialize() {
         m_Descriptors = (VulkanDescriptors*)calloc(_shaders.size(), sizeof(VulkanDescriptors));
+        InitializeCompImages();
         InitializeSSBO();
         InitializeUBO();
+        InitializeDenoiseOpts();
         InitializeDescriptors();
+    }
+
+    void VData::InitializeDenoiseOpts()
+    {
+        DenoiseStuff* denoise_data = (DenoiseStuff*)calloc(1, sizeof(DenoiseStuff));
+
+        VkDeviceSize bufferSize = sizeof(DenoiseStuff);
+        VulkanDataBuffer stagingBuffer;
+        VUTILS::CreateBuffer(
+                bufferSize,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                &stagingBuffer);
+
+        float max_w = std::max(_render_width, _render_height);
+        max_w = std::pow(2, std::ceil(log2(max_w)));
+        {
+            denoise_data->bias = glm::vec3(0., 0., 0.);
+            denoise_data->median = glm::vec3(0., 0., 0.);
+            denoise_data->width = max_w;
+            denoise_data->height = max_w;
+            denoise_data->mode = 1.f;
+        }
+
+
+        void* data;
+        vkMapMemory(_interface, stagingBuffer.memory, 0, bufferSize, 0, &data);
+        memcpy(data, denoise_data, (size_t)bufferSize);
+        vkUnmapMemory(_interface, stagingBuffer.memory);
+
+        VUTILS::CreateBuffer(
+                bufferSize,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                &(m_denoise_opts));
+        VUTILS::CopyBuffer(stagingBuffer.buffer, m_denoise_opts.buffer, bufferSize);
+        vkDestroyBuffer(_interface, stagingBuffer.buffer, nullptr);
+        vkFreeMemory(_interface, stagingBuffer.memory, nullptr);
+        free(denoise_data);
+    }
+    void VData::InitializeCompImages()
+    {
+        float max_w = std::max(_render_width, _render_height);
+        max_w = std::pow(2, std::ceil(log2(max_w)));
+        max_size = (size_t)(max_w * max_w);
+
+        uint32_t imgw = max_w;
+        uint32_t imgh = max_w;
+
+        for (int i = 0; i < m_comp_imgs.size(); i++)
+        {
+            float* data_float = (float*)calloc(imgw * imgh, sizeof(float));
+
+            VkDeviceSize bufferSize = sizeof(float) * imgw * imgh;
+            VulkanDataBuffer stagingBuffer;
+            VUTILS::CreateBuffer(
+                    bufferSize,
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                    &stagingBuffer);
+            void* data;
+            vkMapMemory(_interface, stagingBuffer.memory, 0, bufferSize, 0, &data);
+            memcpy(data, data_float, (size_t)bufferSize);
+            vkUnmapMemory(_interface, stagingBuffer.memory);
+
+            VUTILS::CreateBuffer(
+                    bufferSize,
+                    VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    &(m_comp_imgs[i]));
+            VUTILS::CopyBuffer(stagingBuffer.buffer, m_comp_imgs[i].buffer, bufferSize);
+
+            vkDestroyBuffer(_interface, stagingBuffer.buffer, nullptr);
+            vkFreeMemory(_interface, stagingBuffer.memory, nullptr);
+            free(data_float);
+        }
     }
 
     void VData::Reconstruct() {
@@ -32,6 +112,14 @@ namespace VSTIR {
         VUTILS::DestroyBuffer(m_SSBO);
         m_SSBO = {};
         InitializeSSBO();
+
+        for (int i = 0; i < m_comp_imgs.size(); i++)
+        {
+            VUTILS::DestroyBuffer(m_comp_imgs[i]);
+            m_comp_imgs[i] = {};
+        }
+
+        InitializeCompImages();
     }
 
     void VData::InitializeSSBO() {
@@ -188,8 +276,13 @@ namespace VSTIR {
         ubo.u = glm::normalize(glm::cross(ubo.up, ubo.w));
         ubo.v = glm::normalize(glm::cross(ubo.w, ubo.u));
 
-        // denoise
-        ubo.denoise_bias = render_settings.denoise_bias;
+        // new
+        {
+            ubo.denoise_bias = render_settings.denoise_bias;
+            float max_w = std::max(ubo.width, ubo.height);
+            max_w = std::pow(2, std::ceil(log2(max_w)));
+            ubo.max_width = max_w;
+        }
         // View matrix
         static glm::mat4 vpm;
         static bool first_vpm = true;

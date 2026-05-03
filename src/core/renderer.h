@@ -2,7 +2,9 @@
 
 #include "vulkan/backend.h"
 #include "vulkan/vstructs.h"
+#include <cmath>
 #include <cstddef>
+#include <cstdint>
 
 #include "camera.h"
 
@@ -48,6 +50,7 @@ namespace VSTIR {
         camera& GetCamera() { return m_Camera; }
 
         RenderSettings& GetSettings() { return m_settings; }
+
     private:
         void RecordCommand(uint32_t imageIndex);
         bool ConstructOBJ(const StateOBJ state);

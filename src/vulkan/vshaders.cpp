@@ -1,7 +1,9 @@
 #include "vshaders.h"
 #include "util/log.h"
 #include "core/get.h"
+#include <cmath>
 #include <cstring>
+#include <iostream>
 
 namespace VSTIR {
 
@@ -134,7 +136,9 @@ namespace VSTIR {
     				sizeof(NodeBVH)
     			}
     		};
-	} else if (strcmp(name, "RayGeneratorSSBOIn") == 0) {
+	} 
+        else if (strcmp(name, "RayGeneratorSSBOIn") == 0) 
+        {
 		return (VulkanBoundVariable) {
 			STORAGE_BUFFER,
 			(SchrodingRef) {
@@ -150,6 +154,56 @@ namespace VSTIR {
 			}
 	    };
     }
+        else if (strcmp(name, "DenoiseStuff") == 0) 
+        {
+            return (VulkanBoundVariable) {
+                STORAGE_BUFFER,
+                (SchrodingRef) {
+                    true,
+                    &(_data.DenoiseOpts().buffer)
+                },
+                (SchrodingSize) {
+                    (SchrodingRef) {
+                        true,
+                        (void*)(_data.DenoiseCount()),
+                    }, 0.0f,
+                    sizeof(DenoiseStuff)
+                }
+            };
+        }
+        else 
+        {
+            std::array<char*, 6> imgs{
+            {
+                "outr",
+                "outb",
+                "outg",
+                "outr2",
+                "outb2",
+                "outg2"
+            }};
+            for (int i = 0; i < imgs.size(); i++)
+            {
+
+                if (strcmp(name, imgs[i]) == 0)
+                {
+                    return (VulkanBoundVariable) {
+                        STORAGE_BUFFER,
+                        (SchrodingRef) {
+                            true,
+                            &(_data.CompImgs()[i].buffer)
+                        },
+                        (SchrodingSize) {
+                            (SchrodingRef) {
+                                true,
+                                (void*)(_data.MaxSize())
+                            }, 0.0f,
+                            sizeof(float)
+                        }
+                    };
+                }
+            }
+        }
         WARN("Unable to automatically identify source references of shader variable \"%s\"", name);
     	return (VulkanBoundVariable){};
     }

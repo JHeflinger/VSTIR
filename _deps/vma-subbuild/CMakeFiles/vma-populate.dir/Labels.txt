@@ -1,0 +1,14 @@
+# Target labels
+ vma-populate
+# Source files and their labels
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/vma-populate
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/vma-populate.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/CMakeFiles/vma-populate-complete.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-build.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-configure.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-download.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-install.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-mkdir.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-patch.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-test.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/vma-subbuild/vma-populate-prefix/src/vma-populate-stamp/vma-populate-update.rule

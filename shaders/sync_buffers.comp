@@ -1,0 +1,95 @@
+#version 450
+
+#define inv_sqrt2 0.707106
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+    uint buffer_idx;
+    float denoise_bias;
+    float max_width;
+} ubo;
+
+
+layout(binding = 1) buffer outr {
+    float rimg[ ];
+};
+
+layout(binding = 2) buffer outg {
+    float gimg[ ];
+};
+
+layout(binding = 3) buffer outb {
+    float bimg[ ];
+};
+
+layout(binding = 4) buffer outr2 {
+    float rimg2[ ];
+};
+
+layout(binding = 5) buffer outg2 {
+    float gimg2[ ];
+};
+
+layout(binding = 6) buffer outb2 {
+    float bimg2[ ];
+};
+
+struct DenoiseOpts 
+{
+    vec3 bias;
+    vec3 median;
+    float width;
+    float height;
+    float mode;
+};
+
+layout(binding = 7) buffer DenoiseStuff {
+    DenoiseOpts opts;
+};
+
+void main()
+{
+    uint pixel_count = uint(ubo.max_width) * uint(ubo.max_width);
+    if (gl_GlobalInvocationID.x >= pixel_count) 
+    {
+        return;
+    }
+    uint idxx = gl_GlobalInvocationID.x;
+    rimg2[idxx] = rimg[idxx];
+    gimg2[idxx] = gimg[idxx];
+    bimg2[idxx] = bimg[idxx];
+    if (idxx == 0)
+    {
+        if (opts.mode == 1.f)
+        {
+            opts.mode = 0.5f;
+            opts.width *= 0.5f;
+            opts.height *= 0.5f;
+        }
+        else if (opts.mode == 0.f)
+        {
+            opts.mode = 0.5f;
+            opts.width *= 2.f;
+            opts.height *= 2.f;
+        }
+    }
+}

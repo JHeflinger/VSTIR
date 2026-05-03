@@ -1,0 +1,104 @@
+#version 450
+
+#define inv_sqrt2 0.707106
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+    uint buffer_idx;
+    float denoise_bias;
+    float max_width;
+} ubo;
+
+
+layout(binding = 1) buffer outr {
+    float rimg[ ];
+};
+
+layout(binding = 2) buffer outg {
+    float gimg[ ];
+};
+
+layout(binding = 3) buffer outb {
+    float bimg[ ];
+};
+
+layout(binding = 4) buffer outr2 {
+    float rimg2[ ];
+};
+
+layout(binding = 5) buffer outg2 {
+    float gimg2[ ];
+};
+
+layout(binding = 6) buffer outb2 {
+    float bimg2[ ];
+};
+
+
+struct DenoiseOpts 
+{
+    vec3 bias;
+    vec3 median;
+    float width;
+    float height;
+    float mode;
+};
+
+layout(binding = 7) buffer DenoiseStuff {
+    DenoiseOpts opts;
+};
+
+void main()
+{
+    opts.mode = 0.f;
+    uint pixel_count = uint(opts.width*2) * uint(opts.height*2);
+    if (gl_GlobalInvocationID.x >= pixel_count) 
+    {
+        return;
+    }
+    uint idxx = gl_GlobalInvocationID.x;
+    uint x = idxx % uint(opts.width*2);
+    uint y = idxx / uint(opts.width*2);
+    ivec2 idx = ivec2(x, y);
+    uint width = uint(opts.width*2);
+    uint stride = uint(ubo.max_width);
+    if (idx.y < width && idx.x < width/2)
+    {
+        float low  = rimg2[idx.y * stride + idx.x];
+        float high = rimg2[idx.y * stride + idx.x + width/2];
+
+        rimg[idx.y * stride + idx.x * 2] = (low + high) * inv_sqrt2;
+        rimg[idx.y * stride + idx.x * 2 + 1] = (low - high) * inv_sqrt2;
+
+        low  = gimg2[idx.y * stride + idx.x];
+        high = gimg2[idx.y * stride + idx.x + width/2];
+
+        gimg[idx.y * stride + idx.x * 2] = (low + high) * inv_sqrt2;
+        gimg[idx.y * stride + idx.x * 2 + 1] = (low - high) * inv_sqrt2;
+
+        low  = bimg2[idx.y * stride + idx.x];
+        high = bimg2[idx.y * stride + idx.x + width/2];
+
+        bimg[idx.y * stride + idx.x * 2] = (low + high) * inv_sqrt2;
+        bimg[idx.y * stride + idx.x * 2 + 1] = (low - high) * inv_sqrt2;
+    }
+}

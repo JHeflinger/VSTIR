@@ -35,6 +35,14 @@ namespace VSTIR {
         alignas(16) glm::vec3 radiance_initial;
         alignas(4) float W_initial;
     };
+    struct DenoiseStuff
+    {
+        alignas(16) glm::vec3 bias;
+        alignas(16) glm::vec3 median;
+        alignas(4) float width;
+        alignas(4) float height;
+        alignas(4) float mode;
+    };
 
     typedef enum {
 	    UNIFORM_BUFFER = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
@@ -144,6 +152,7 @@ namespace VSTIR {
         alignas(4) uint32_t spacecount;
         alignas(4) uint32_t buffer_idx;
         alignas(4) float denoise_bias;
+        alignas(4) float max_width;
     };
 
     struct VulkanSwapchain {

@@ -1,0 +1,112 @@
+#version 450
+
+#define inv_sqrt2 0.707106
+#define sqrt2 (1.4142)
+#define NORM_FAC (0.6745)
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+    uint buffer_idx;
+    float denoise_bias;
+    float max_width;
+} ubo;
+
+
+layout(binding = 1) buffer outr {
+    float rimg[ ];
+};
+
+layout(binding = 2) buffer outg {
+    float gimg[ ];
+};
+
+layout(binding = 3) buffer outb {
+    float bimg[ ];
+};
+
+layout(binding = 4) buffer outr2 {
+    float rimg2[ ];
+};
+
+layout(binding = 5) buffer outg2 {
+    float gimg2[ ];
+};
+
+layout(binding = 6) buffer outb2 {
+    float bimg2[ ];
+};
+
+
+struct DenoiseOpts 
+{
+    vec3 bias;
+    vec3 median;
+    float width;
+    float height;
+    float mode;
+};
+
+layout(binding = 7) buffer DenoiseStuff {
+    DenoiseOpts opts;
+};
+
+void main()
+{
+    if (gl_GlobalInvocationID.x == 0)
+    {
+        opts.mode = 1.f;
+    }
+    uint pixel_count = uint(opts.width) * uint(opts.height);
+    uint width = uint(opts.width);
+    uint height = uint(opts.height);
+    uint idxx = gl_GlobalInvocationID.x;
+    uint x = idxx % width;
+    uint y = idxx / width;
+    uint stride= uint(ubo.max_width);
+    if (gl_GlobalInvocationID.x >= pixel_count || (x < width / 2 && y < height / 2)) 
+    {
+        return;
+    }
+    /*
+    uint lx = uint(3. * opts.width / 4.);
+    uint ly = uint(3. * opts.height / 4.);
+    opts.median.r = rimg2[ly * stride + lx] / NORM_FAC;
+    opts.median.g = bimg2[ly * stride + lx] / NORM_FAC;
+    opts.median.b = gimg2[ly * stride + lx] / NORM_FAC;
+    if (opts.width == ubo.width) // global bias
+    {
+        opts.bias = opts.median;
+    }
+    else 
+    {
+        opts.median = sqrt(max(opts.median * opts.median - opts.bias * opts.bias, 0.));
+        opts.median = (opts.bias * opts.bias) / (opts.median + 1e-4);
+    }
+    */
+    opts.median = vec3(0);
+    opts.median += vec3(ubo.denoise_bias);
+    uint idx = y * stride + x;
+    vec3 temp = vec3(rimg[idx], gimg[idx], bimg[idx]);
+    rimg[idx] = sign(temp.r) * max(abs(temp.r) - opts.median.r, 0.);
+    gimg[idx] = sign(temp.g) * max(abs(temp.g) - opts.median.g, 0.);
+    bimg[idx] = sign(temp.b) * max(abs(temp.b) - opts.median.b, 0.);
+}

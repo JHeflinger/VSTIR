@@ -1,0 +1,90 @@
+#version 450
+
+#define LEVELS 3
+#define CORRECTION (0.6745)
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+    uint buffer_idx;
+    float denoise_bias;
+    float max_width;
+} ubo;
+
+
+layout(binding = 1, rgba8) readonly uniform image2D inputImage;
+
+layout(binding = 2) buffer outr {
+    float rimg[ ];
+};
+
+layout(binding = 3) buffer outg {
+    float gimg[ ];
+};
+
+layout(binding = 4) buffer outb {
+    float bimg[ ];
+};
+
+layout(binding = 5) buffer outr2 {
+    float rimg2[ ];
+};
+
+layout(binding = 6) buffer outg2 {
+    float gimg2[ ];
+};
+
+layout(binding = 7) buffer outb2 {
+    float bimg2[ ];
+};
+
+
+void main()
+{
+    uint max_count = uint(ubo.max_width) * uint(ubo.max_width);
+    if (gl_GlobalInvocationID.x >= max_count) 
+    {
+        return;
+    }
+    uint idx = gl_GlobalInvocationID.x;
+    uint x = min(idx % uint(ubo.max_width), uint(ubo.width) - 1);
+    uint y = min(idx / uint(ubo.max_width), uint(ubo.height) - 1);
+
+    float r = 0.;
+    float g = 0.;
+    float b = 0.;
+
+    if (x < uint(ubo.width) && y < uint(ubo.height))
+    {
+        vec4 pixel = imageLoad(inputImage, ivec2(x, y));
+        r = float(pixel.r);
+        g = float(pixel.g);
+        b = float(pixel.b);
+    }
+
+    rimg[idx] = r;
+    gimg[idx] = g;
+    bimg[idx] = b;
+
+    rimg2[idx] = r;
+    gimg2[idx] = g;
+    bimg2[idx] = b;
+}

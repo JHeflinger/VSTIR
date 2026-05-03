@@ -1,0 +1,138 @@
+#version 450
+
+#define inv_sqrt2 0.707106
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+layout(binding = 0) uniform UniformBufferObject {
+    vec3 look;
+    vec3 position;
+    vec3 up;
+    vec3 u;
+    vec3 v;
+    vec3 w;
+    uint triangles;
+    uint seed;
+    uint samples;
+    float fov;
+    float width;
+    float height;
+    mat4 previousvpm;
+    float depththreshold;
+    float normalthreshold;
+    uint contributioncap;
+    uint candidatecap;
+    uint spacerange;
+    uint spacecount;
+    uint buffer_idx;
+    float denoise_bias;
+    float max_width;
+} ubo;
+
+
+layout(binding = 1) buffer outr {
+    float rimg[ ];
+};
+
+layout(binding = 2) buffer outg {
+    float gimg[ ];
+};
+
+layout(binding = 3) buffer outb {
+    float bimg[ ];
+};
+
+layout(binding = 4) buffer outr2 {
+    float rimg2[ ];
+};
+
+layout(binding = 5) buffer outg2 {
+    float gimg2[ ];
+};
+
+layout(binding = 6) buffer outb2 {
+    float bimg2[ ];
+};
+
+
+struct DenoiseOpts 
+{
+    vec3 bias;
+    vec3 median;
+    float width;
+    float height;
+    float mode;
+};
+
+layout(binding = 7) buffer DenoiseStuff {
+    DenoiseOpts opts;
+};
+
+void main()
+{
+    uint pixel_count = (uint(opts.width / 2.) * uint(opts.height/2.)) / 2;
+    if (gl_GlobalInvocationID.x >= pixel_count) 
+    {
+        return;
+    }
+    uint width = uint(opts.width / 2.);
+    uint height = uint(opts.height / 2.);
+    uint stride= uint(ubo.max_width);
+
+    uint idxx1;
+    uint idxx2;
+    if (opts.mode == 0.5) // odd
+    {
+        idxx1 = gl_GlobalInvocationID.x * 2 + 1;
+        idxx2 = gl_GlobalInvocationID.x * 2 + 2;
+        if (gl_GlobalInvocationID.x >= (pixel_count - 2))
+        {
+            opts.mode == 0.25;
+        }
+    }
+    else if (opts.mode == 0.25) // even
+    {
+        idxx1 = gl_GlobalInvocationID.x * 2;
+        idxx2 = gl_GlobalInvocationID.x * 2 + 1;
+        if (gl_GlobalInvocationID.x >= (pixel_count - 1))
+        {
+            opts.mode == 0.5;
+        }
+    }
+    else 
+    {
+        return;
+    }
+
+    // add (width, height) to operate on lower right region
+    uint x1 = idxx1 % width + width;
+    uint y1 = idxx1 / width + height;
+    uint x2 = idxx2 % width + width;
+    uint y2 = idxx2 / width + height;
+
+    uint idx1 = y1 * stride + x1;
+    uint idx2 = y2 * stride + x2;
+
+    if (abs(rimg2[idx2]) < abs(rimg2[idx1]))
+    {
+        float temp1 = rimg2[idx1];
+        float temp2 = rimg2[idx2];
+        rimg2[idx1] = temp2;
+        rimg2[idx2] = temp1;
+    }
+
+    if (abs(gimg2[idx2]) < abs(gimg2[idx1]))
+    {
+        float temp1 = gimg2[idx1];
+        float temp2 = gimg2[idx2];
+        gimg2[idx1] = temp2;
+        gimg2[idx2] = temp1;
+    }
+
+    if (abs(bimg2[idx2]) < abs(bimg2[idx1]))
+    {
+        float temp1 = bimg2[idx1];
+        float temp2 = bimg2[idx2];
+        bimg2[idx1] = temp2;
+        bimg2[idx2] = temp1;
+    }
+}

@@ -1,0 +1,14 @@
+# Target labels
+ glfw-populate
+# Source files and their labels
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/CMakeFiles/glfw-populate
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/CMakeFiles/glfw-populate.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/CMakeFiles/glfw-populate-complete.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-build.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-configure.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-download.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-install.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-mkdir.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-patch.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-test.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/glfw-subbuild/glfw-populate-prefix/src/glfw-populate-stamp/glfw-populate-update.rule

@@ -776,7 +776,10 @@ namespace VSTIR {
         if (_render_settings.denoiser) {
             ImGui::Text("bias: ");
             ImGui::SameLine();
-            ImGui::SliderFloat("##denoise_bias", &_render_settings.denoise_bias, 0.0f, 1.0f, "%.1f");
+            if(ImGui::SliderFloat("##denoise_bias", &_render_settings.denoise_bias, 0.0f, 0.1, "%.3f"))
+            {
+                //_render_settings.denoise_bias
+            }
             /*
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.50f, 0.30f, 0.30f, 1.0f));
             ImGui::TextWrapped("Denoiser not yet implemented.");

@@ -39,7 +39,15 @@ namespace VSTIR {
         ADDSHADER("temporal");
         ADDSHADER("spacial");
         ADDSHADER("compile");
-        ADDSHADER("denoise");
+        ADDSHADER("sync_buffers");
+        ADDSHADER("separate_components");
+        ADDSHADER("sort_iteration");
+        ADDSHADER("threshold");
+        ADDSHADER("haar_horizontal");
+        ADDSHADER("haar_vertical");
+        ADDSHADER("inv_haar_horizontal");
+        ADDSHADER("inv_haar_vertical");
+        ADDSHADER("combine_components");
         #undef ADDSHADER
     }
 

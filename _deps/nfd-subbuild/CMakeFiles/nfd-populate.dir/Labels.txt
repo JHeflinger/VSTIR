@@ -1,0 +1,14 @@
+# Target labels
+ nfd-populate
+# Source files and their labels
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/CMakeFiles/nfd-populate
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/CMakeFiles/nfd-populate.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/CMakeFiles/nfd-populate-complete.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-build.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-configure.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-download.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-install.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-mkdir.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-patch.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-test.rule
+/home/aamen/school/spring26/graphics/VSTIR/_deps/nfd-subbuild/nfd-populate-prefix/src/nfd-populate-stamp/nfd-populate-update.rule

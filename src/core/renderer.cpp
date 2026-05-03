@@ -2,11 +2,13 @@
 #include "core/editor.h"
 #include "core/get.h"
 #include "core/ui.h"
+#include "get.h"
 #include "util/log.h"
 #include "util/file.h"
 #include "util/bvh.h"
 #include "vulkan/vutil.h"
 #include <iostream>
+#include <unordered_map>
 #include <vulkan/vulkan.h>
 #include <cstring>
 #include <vector>
@@ -732,33 +734,79 @@ namespace VSTIR {
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
         VkResult result = vkBeginCommandBuffer(_scheduler.Commands().command, &beginInfo);
         ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
+        std::unordered_map<std::string, int> shader_name_idx_map;
+        {
+            shader_name_idx_map["render"] = 0;
+            shader_name_idx_map["resevoir"] = 1;
+            shader_name_idx_map["temporal"] = 2;
+            shader_name_idx_map["spacial"] = 3;
+            shader_name_idx_map["compile"] = 4;
+            shader_name_idx_map["sync"] = 5;
+            shader_name_idx_map["separate"] = 6;
+            shader_name_idx_map["sort"] = 7;
+            shader_name_idx_map["threshold"] = 8;
+            shader_name_idx_map["haar_horizontal"] = 9;
+            shader_name_idx_map["haar_vertical"] = 10;
+            shader_name_idx_map["inv_haar_horizontal"] = 11;
+            shader_name_idx_map["inv_haar_vertical"] = 12;
+            shader_name_idx_map["combine"] = 13;
+        }
+        float max_w = std::max(_render_width, _render_height);
+        max_w = std::pow(2, std::ceil(log2(max_w)));
 
         // execute shader stages
         std::vector<int> shader_idxs;
         if (m_settings.restir)
         {
-            shader_idxs.push_back(1);
+            shader_idxs.push_back(shader_name_idx_map["resevoir"]);
             if (m_settings.temporal)
             {
-                shader_idxs.push_back(2);
+                shader_idxs.push_back(shader_name_idx_map["temporal"]);
             }
             if (m_settings.spacial)
             {
-                shader_idxs.push_back(3);
+                shader_idxs.push_back(shader_name_idx_map["spacial"]);
             }
-            shader_idxs.push_back(4);
+            shader_idxs.push_back(shader_name_idx_map["compile"]);
         }
         else 
         {
-            shader_idxs.push_back(0);
+            shader_idxs.push_back(shader_name_idx_map["render"]);
         }
         if (m_settings.denoiser)
         {
-            shader_idxs.push_back(5);
+            shader_idxs.push_back(shader_name_idx_map["separate"]);
+            for (int i = 0; i < 5; i++)
+            {
+                shader_idxs.push_back(shader_name_idx_map["haar_horizontal"]);
+                shader_idxs.push_back(shader_name_idx_map["sync"]);
+                shader_idxs.push_back(shader_name_idx_map["haar_vertical"]);
+                shader_idxs.push_back(shader_name_idx_map["sync"]);
+
+                /*
+                for (int j = 0; j < iters; j++)
+                {
+                    shader_idxs.push_back(shader_name_idx_map["sort"]);
+                }
+                */
+                    shader_idxs.push_back(shader_name_idx_map["threshold"]);
+                    shader_idxs.push_back(shader_name_idx_map["sync"]);
+            }
+            for (int i = 0; i < 5; i++)
+            {
+                shader_idxs.push_back(shader_name_idx_map["inv_haar_vertical"]);
+                shader_idxs.push_back(shader_name_idx_map["sync"]);
+                shader_idxs.push_back(shader_name_idx_map["inv_haar_horizontal"]);
+                shader_idxs.push_back(shader_name_idx_map["sync"]);
+            }
+            shader_idxs.push_back(shader_name_idx_map["combine"]);
         }
         
         for (auto i : shader_idxs) {
-            uint32_t invocations = _render_width * _render_height;
+            uint32_t invocations = 
+                (_render_width * _render_height) * (i < 5)
+                + (max_w * max_w) * !(i < 5);
+
             vkCmdBindPipeline(
                 _scheduler.Commands().command,
                 VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -772,8 +820,8 @@ namespace VSTIR {
                 &(_data.Descriptors()[i].set),
                 0,
                 nullptr);
-            int x = (i != 5) * WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE) + (i==5) * (WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE>>1));
-            int y = (i != 5) + (i==5) * (WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE>>1));
+            int x = WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE);
+            int y = 1;
             vkCmdDispatch(_scheduler.Commands().command, x, y, 1);
             VUTILS::RecordGeneralBarrier(_scheduler.Commands().command);
         }

@@ -1,0 +1,42 @@
+file(REMOVE_RECURSE
+  "../bin/vstir"
+  "../bin/vstir.pdb"
+  "CMakeFiles/vstir.dir/link.d"
+  "CMakeFiles/vstir.dir/core/camera.cpp.o"
+  "CMakeFiles/vstir.dir/core/camera.cpp.o.d"
+  "CMakeFiles/vstir.dir/core/editor.cpp.o"
+  "CMakeFiles/vstir.dir/core/editor.cpp.o.d"
+  "CMakeFiles/vstir.dir/core/renderer.cpp.o"
+  "CMakeFiles/vstir.dir/core/renderer.cpp.o.d"
+  "CMakeFiles/vstir.dir/core/ui.cpp.o"
+  "CMakeFiles/vstir.dir/core/ui.cpp.o.d"
+  "CMakeFiles/vstir.dir/main.cpp.o"
+  "CMakeFiles/vstir.dir/main.cpp.o.d"
+  "CMakeFiles/vstir.dir/util/bvh.cpp.o"
+  "CMakeFiles/vstir.dir/util/bvh.cpp.o.d"
+  "CMakeFiles/vstir.dir/util/file.cpp.o"
+  "CMakeFiles/vstir.dir/util/file.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/backend.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/backend.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vcontext.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vcontext.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vcore.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vcore.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vdata.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vdata.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vgeneral.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vgeneral.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vmetadata.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vmetadata.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vscheduler.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vscheduler.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vshaders.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vshaders.cpp.o.d"
+  "CMakeFiles/vstir.dir/vulkan/vutil.cpp.o"
+  "CMakeFiles/vstir.dir/vulkan/vutil.cpp.o.d"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/vstir.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

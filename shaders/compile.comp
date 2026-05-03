@@ -100,6 +100,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacecount;
     uint buffer_idx;
     float denoise_bias;
+    float max_width;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -127,6 +128,18 @@ layout(binding = 6) buffer RayGeneratorSSBOIn {
 };
 
 layout(binding = 7, rgba8) uniform image2D outputImage;
+
+layout(binding = 8) buffer outr {
+    float rimg[ ];
+};
+
+layout(binding = 9) buffer outg {
+    float gimg[ ];
+};
+
+layout(binding = 10) buffer outb {
+    float bimg[ ];
+};
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 

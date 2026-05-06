@@ -74,7 +74,7 @@ namespace VSTIR {
             VkPushConstantRange pushRange = { 0 };
             pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
             pushRange.offset = 0;
-            pushRange.size = sizeof(uint32_t);
+            pushRange.size = 2*sizeof(uint32_t);
 
             VkPipelineLayoutCreateInfo layoutInfo{};
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

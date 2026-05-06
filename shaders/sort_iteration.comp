@@ -67,6 +67,11 @@ struct DenoiseOpts
     float mode;
 };
 
+layout(push_constant) uniform PushConstants {
+    uint atrous_level;
+    uint sort_order;
+} pc;
+
 layout(binding = 7) buffer DenoiseStuff {
     DenoiseOpts opts;
 };
@@ -84,23 +89,15 @@ void main()
 
     uint idxx1;
     uint idxx2;
-    if (opts.mode == 0.5) // odd
+    if ((pc.sort_order % 2) == 0) // odd
     {
         idxx1 = gl_GlobalInvocationID.x * 2 + 1;
         idxx2 = gl_GlobalInvocationID.x * 2 + 2;
-        if (gl_GlobalInvocationID.x >= (pixel_count - 2))
-        {
-            opts.mode == 0.25;
-        }
     }
-    else if (opts.mode == 0.25) // even
+    else if (pc.sort_order == 1) // even
     {
         idxx1 = gl_GlobalInvocationID.x * 2;
         idxx2 = gl_GlobalInvocationID.x * 2 + 1;
-        if (gl_GlobalInvocationID.x >= (pixel_count - 1))
-        {
-            opts.mode == 0.5;
-        }
     }
     else 
     {

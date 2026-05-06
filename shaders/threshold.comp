@@ -69,6 +69,11 @@ struct DenoiseOpts
     float mode;
 };
 
+layout(push_constant) uniform PushConstants {
+    uint atrous_level;
+    uint sort_order;
+} pc;
+
 layout(binding = 7) buffer DenoiseStuff {
     DenoiseOpts opts;
 };
@@ -90,27 +95,30 @@ void main()
     {
         return;
     }
-    /*
-    uint lx = uint(3. * opts.width / 4.);
-    uint ly = uint(3. * opts.height / 4.);
-    opts.median.r = rimg2[ly * stride + lx] / NORM_FAC;
-    opts.median.g = bimg2[ly * stride + lx] / NORM_FAC;
-    opts.median.b = gimg2[ly * stride + lx] / NORM_FAC;
-    if (opts.width == ubo.width) // global bias
+    vec3 final = vec3(0);
+    if (pc.sort_order != 2)
     {
-        opts.bias = opts.median;
+        uint lx = uint(3. * opts.width / 4.);
+        uint ly = uint(3. * opts.height / 4.);
+        final.r = rimg2[ly * stride + lx] / NORM_FAC;
+        final.g = bimg2[ly * stride + lx] / NORM_FAC;
+        final.b = gimg2[ly * stride + lx] / NORM_FAC;
+        if (opts.width == ubo.width) // global bias
+        {
+            opts.bias = final;
+        }
+        else 
+        {
+            final = sqrt(max(final * final - opts.bias * opts.bias, 0.));
+            final = (opts.bias * opts.bias) / (final + 1e-4);
+            //    final = vec3(0);
+        }
+
     }
-    else 
-    {
-        opts.median = sqrt(max(opts.median * opts.median - opts.bias * opts.bias, 0.));
-        opts.median = (opts.bias * opts.bias) / (opts.median + 1e-4);
-    }
-    */
-    opts.median = vec3(0);
-    opts.median += vec3(ubo.denoise_bias);
+    final += vec3(ubo.denoise_bias);
     uint idx = y * stride + x;
     vec3 temp = vec3(rimg[idx], gimg[idx], bimg[idx]);
-    rimg[idx] = sign(temp.r) * max(abs(temp.r) - opts.median.r, 0.);
-    gimg[idx] = sign(temp.g) * max(abs(temp.g) - opts.median.g, 0.);
-    bimg[idx] = sign(temp.b) * max(abs(temp.b) - opts.median.b, 0.);
+    rimg[idx] = sign(temp.r) * max(abs(temp.r) - final.r, 0.);
+    gimg[idx] = sign(temp.g) * max(abs(temp.g) - final.g, 0.);
+    bimg[idx] = sign(temp.b) * max(abs(temp.b) - final.b, 0.);
 }

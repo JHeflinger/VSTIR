@@ -7,6 +7,8 @@
 #include "util/file.h"
 #include "util/bvh.h"
 #include "vulkan/vutil.h"
+#include <algorithm>
+#include <cstdint>
 #include <iostream>
 #include <unordered_map>
 #include <vulkan/vulkan.h>
@@ -757,6 +759,9 @@ namespace VSTIR {
         float max_w = std::max(_render_width, _render_height);
         max_w = std::pow(2, std::ceil(log2(max_w)));
 
+        uint32_t atrous_passes = 4;
+        uint32_t curr_filter_passes = 0;
+        uint32_t sort_order = 2;
         // execute shader stages
         std::vector<int> shader_idxs;
         //if (m_settings.restir)
@@ -772,7 +777,10 @@ namespace VSTIR {
                 shader_idxs.push_back(shader_name_idx_map["spacial"]);
             }
             shader_idxs.push_back(shader_name_idx_map["compile"]);
-            shader_idxs.push_back(shader_name_idx_map["bilateral"]);
+            for (int i = 0; i < atrous_passes; i++)
+            {
+                shader_idxs.push_back(shader_name_idx_map["bilateral"]);
+            }
             shader_idxs.push_back(shader_name_idx_map["merge"]);
         }
         /*
@@ -793,6 +801,7 @@ namespace VSTIR {
                 shader_idxs.push_back(shader_name_idx_map["sync"]);
 
                 /*
+                int iters = std::min(100, (int) ((max_w * max_w) / (1 << i))) ;
                 for (int j = 0; j < iters; j++)
                 {
                     shader_idxs.push_back(shader_name_idx_map["sort"]);
@@ -811,20 +820,24 @@ namespace VSTIR {
             shader_idxs.push_back(shader_name_idx_map["combine"]);
         }
         
+        struct PS 
+        {
+            alignas(4) uint32_t filter_passes;
+            alignas(4) uint32_t sorder;
+        };
 
-        uint32_t atrous_passes = 4;
-        uint32_t curr_filter_passes = 0;
         for (auto i : shader_idxs) {
             uint32_t invocations = 
-                (_render_width * _render_height) * (i < 7)
-                + (max_w * max_w) * !(i < 7);
-            if (i == shader_name_idx_map["bilateral"]) {
+                (_render_width * _render_height) * (i < shader_name_idx_map["sync"])
+                + (max_w * max_w) * !(i < shader_name_idx_map["sync"]);
+            if (i == shader_name_idx_map["bilateral"] || i == shader_name_idx_map["sort"]) {
                 uint32_t pc = curr_filter_passes;
+                PS pc_sort = {curr_filter_passes, sort_order};
                 vkCmdPushConstants(
                         _scheduler.Commands().command,
                         _context.Pipeline().layout[i],
                         VK_SHADER_STAGE_COMPUTE_BIT,
-                        0, sizeof(uint32_t), &pc);
+                        0, 2*sizeof(uint32_t), &pc_sort);
             }
             vkCmdBindPipeline(
                     _scheduler.Commands().command,
@@ -846,7 +859,11 @@ namespace VSTIR {
             //if (i > 4 && i < _shaders.size() - 1) {
             if (i == shader_name_idx_map["bilateral"]) {
                 curr_filter_passes++;
-                if (curr_filter_passes < atrous_passes) i--;
+               // if (curr_filter_passes < atrous_passes) i--;
+            }
+            if (i == shader_name_idx_map["sort"])
+            {
+                sort_order = ((sort_order % 2) ==  0);
             }
         }
 

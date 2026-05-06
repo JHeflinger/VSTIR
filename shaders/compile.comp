@@ -104,6 +104,13 @@ layout(binding = 0) uniform UniformBufferObject {
     uint directlighting;
     uint divider;
     uint filters;
+    uint restir;
+    uint showdivider;
+    uint directlightingright;
+    uint filtersright;
+    uint restirright;
+    uint restirframes;
+    uint resetreservoirs;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -189,6 +196,22 @@ float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
 
+bool finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+bool right_side() {
+    return ubo.showdivider != 0 && int(gl_GlobalInvocationID.x % uint(ubo.width)) > int(ubo.divider);
+}
+
+bool restir_enabled() {
+    return (right_side() ? ubo.restirright : ubo.restir) != 0;
+}
+
+bool filter_enabled() {
+    return ((right_side() ? ubo.filtersright : ubo.filters) & 1u) != 0;
+}
+
 vec3 beer_lambert(uint material, float dist) {
     return exp(-materialIn[material].absorbtion * dist);
 }
@@ -246,6 +269,9 @@ bool aabb_intersect(Ray ray, uint node_ind) {
 Hit trace(Ray ray, inout uint hit_id) {
     Hit hit;
     hit.distance = -1.0;
+    hit.material = 0;
+    hit.normal = vec3(0.0);
+    hit.position = vec3(0.0);
     if (ubo.triangles == 0) return hit;
     if (!aabb_intersect(ray, 0)) return hit;
     uint stack[MAX_RECURSIVE_DEPTH];
@@ -341,19 +367,28 @@ float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal, in Mate
 vec3 compile_resevoir() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
     if (rg.initial_pdf == 1.0) return rg.spacial_Lo;
+    if (rg.spacial_M == 0 ||
+        rg.spacial_W <= 0.0 ||
+        !finite_vec3(rg.spacial_Lo) ||
+        length(rg.spacial_x_s - rg.spacial_x_v) <= EPS ||
+        length(ubo.position - rg.spacial_x_v) <= EPS) {
+        return rg.direct;
+    }
     vec3 wi = normalize(rg.spacial_x_s - rg.spacial_x_v);
     vec3 wo = normalize(ubo.position - rg.spacial_x_v);
     vec3 brdf_cos = lambertian_throughput(wo, rg.spacial_n_v, wi, materialIn[rg.initial_mat]);
     vec3 f = brdf_cos * rg.spacial_Lo;
-    return f * rg.spacial_W + rg.direct;
+    vec3 indirect = f * rg.spacial_W;
+    if (!finite_vec3(indirect)) indirect = vec3(0.0);
+    return indirect + rg.direct;
 }
 
 void main() {
-    if (ubo.filters != 0) return;
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+    if (!restir_enabled() || filter_enabled()) return;
     init_random(rx, ry);
     vec3 color = compile_resevoir();
     if (ubo.samples == 0) raygenIn[gl_GlobalInvocationID.x].accumulation = vec3(0);

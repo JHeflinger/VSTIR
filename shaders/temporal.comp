@@ -99,6 +99,13 @@ layout(binding = 0) uniform UniformBufferObject {
     uint directlighting;
     uint divider;
     uint filters;
+    uint restir;
+    uint showdivider;
+    uint directlightingright;
+    uint filtersright;
+    uint restirright;
+    uint restirframes;
+    uint resetreservoirs;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -125,10 +132,15 @@ layout(binding = 6) readonly buffer MaterialsSSBOIn {
     Material materialIn[ ];
 };
 
+layout(binding = 7) readonly buffer PreviousRayGeneratorSSBOIn {
+   RayGenerator previousRaygenIn[ ];
+};
+
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
 const float max_contribution = 10;
 const float PI = 3.14159265358979323846;
+const float VISIBILITY_EPS = 0.001;
 uvec4 seed = uvec4(0);
 
 void init_random(int x, int y) {
@@ -206,6 +218,9 @@ bool aabb_intersect(Ray ray, uint node_ind) {
 Hit trace(Ray ray, inout uint hit_id) {
     Hit hit;
     hit.distance = -1.0;
+    hit.material = 0;
+    hit.normal = vec3(0.0);
+    hit.position = vec3(0.0);
     if (ubo.triangles == 0) return hit;
     if (!aabb_intersect(ray, 0)) return hit;
     uint stack[MAX_RECURSIVE_DEPTH];
@@ -249,6 +264,18 @@ float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
 
+bool finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+bool right_side() {
+    return ubo.showdivider != 0 && int(gl_GlobalInvocationID.x % uint(ubo.width)) > int(ubo.divider);
+}
+
+bool restir_enabled() {
+    return (right_side() ? ubo.restirright : ubo.restir) != 0;
+}
+
 float diffuse_pdf(vec3 normal, vec3 incoming) {
     return max(0.0, dot(normal, incoming)) / PI;
 }
@@ -262,30 +289,212 @@ float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal) { //TOD
     return diffuse_pdf(normal, incoming);
 }
 
-void temporal_resample() {
-    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
-    float phat = luminance(rg.initial_Lo);
-    if (rg.initial_pdf == 0) return;
-    float w = phat / rg.initial_pdf;
-    rg.temporal_w += w;
-    rg.temporal_M += 1;
-    if (random() < w / rg.temporal_w) {
+float target_luminance(vec3 x_v, vec3 n_v, uint material_index, vec3 x_s, vec3 Lo) {
+    if (!finite_vec3(Lo) || luminance(Lo) <= EPS) return 0.0;
+    vec3 to_sample = x_s - x_v;
+    if (length(to_sample) <= EPS) return luminance(Lo);
+    vec3 to_view = ubo.position - x_v;
+    if (length(to_view) <= EPS) return 0.0;
+    vec3 wi = normalize(to_sample);
+    vec3 wo = normalize(to_view);
+    vec3 f = lambertian_throughput(wo, n_v, wi, materialIn[material_index]) * Lo;
+    if (!finite_vec3(f)) return 0.0;
+    return luminance(f);
+}
+
+void clear_temporal(inout RayGenerator rg) {
+    rg.temporal_x_v = vec3(0.0);
+    rg.temporal_n_v = vec3(0.0);
+    rg.temporal_x_s = vec3(0.0);
+    rg.temporal_n_s = vec3(0.0);
+    rg.temporal_Lo = vec3(0.0);
+    rg.temporal_w = 0.0;
+    rg.temporal_M = 0;
+    rg.temporal_W = 0.0;
+}
+
+bool valid_initial_candidate(RayGenerator rg) {
+    return rg.initial_pdf > EPS &&
+        finite_vec3(rg.initial_Lo) &&
+        luminance(rg.initial_Lo) > EPS &&
+        length(rg.initial_n_v) > EPS;
+}
+
+bool valid_primary_hit(RayGenerator rg) {
+    return length(rg.initial_n_v) > EPS && length(rg.initial_x_v - ubo.position) > EPS;
+}
+
+bool previous_pixel_for_current(vec3 x_v, out uint prev_idx) {
+    vec4 clip = ubo.previousvpm * vec4(x_v, 1.0);
+    if (clip.w <= EPS) return false;
+    vec3 ndc = clip.xyz / clip.w;
+    if (ndc.x < -1.0 || ndc.x > 1.0 || ndc.y < -1.0 || ndc.y > 1.0) return false;
+    int px = int((ndc.x * 0.5 + 0.5) * ubo.width);
+    int py = int((ndc.y * 0.5 + 0.5) * ubo.height);
+    if (px < 0 || px >= int(ubo.width) || py < 0 || py >= int(ubo.height)) return false;
+    prev_idx = uint(py) * uint(ubo.width) + uint(px);
+    return true;
+}
+
+bool compatible_previous_surface(RayGenerator current, RayGenerator previous) {
+    if (ubo.resetreservoirs != 0 || ubo.restirframes == 0) return false;
+    if (!valid_primary_hit(current) || !valid_primary_hit(previous)) return false;
+    float world_delta = length(current.initial_x_v - previous.initial_x_v);
+    if (world_delta > max(ubo.depththreshold, VISIBILITY_EPS)) return false;
+    if (dot(current.initial_n_v, previous.initial_n_v) < ubo.normalthreshold) return false;
+    return true;
+}
+
+bool visible_sample(vec3 x_v, vec3 n_v, vec3 x_s) {
+    vec3 to_sample = x_s - x_v;
+    float sample_dist = length(to_sample);
+    if (sample_dist <= EPS) return true;
+    Ray sray = { x_v + n_v * EPS, to_sample / sample_dist };
+    uint hit_id = -1;
+    Hit hit = trace(sray, hit_id);
+    if (hit.distance <= 0.0) return false;
+    float tolerance = max(VISIBILITY_EPS, sample_dist * 0.01);
+    return abs(hit.distance - sample_dist) <= tolerance;
+}
+
+bool get_previous_reservoir(
+    RayGenerator current,
+    RayGenerator previous,
+    out vec3 x_s,
+    out vec3 n_s,
+    out vec3 Lo,
+    out float W,
+    out uint M) {
+    if (previous.spacial_M > 0 &&
+        previous.spacial_W > 0.0 &&
+        finite_vec3(previous.spacial_Lo) &&
+        luminance(previous.spacial_Lo) > EPS &&
+        length(previous.spacial_n_s) > EPS &&
+        length(previous.spacial_x_s - current.initial_x_v) > EPS) {
+        x_s = previous.spacial_x_s;
+        n_s = previous.spacial_n_s;
+        Lo = previous.spacial_Lo;
+        W = previous.spacial_W;
+        M = previous.spacial_M;
+        return true;
+    }
+    if (previous.temporal_M > 0 &&
+        previous.temporal_W > 0.0 &&
+        finite_vec3(previous.temporal_Lo) &&
+        luminance(previous.temporal_Lo) > EPS &&
+        length(previous.temporal_n_s) > EPS &&
+        length(previous.temporal_x_s - current.initial_x_v) > EPS) {
+        x_s = previous.temporal_x_s;
+        n_s = previous.temporal_n_s;
+        Lo = previous.temporal_Lo;
+        W = previous.temporal_W;
+        M = previous.temporal_M;
+        return true;
+    }
+    return false;
+}
+
+void merge_temporal_candidate(
+    inout RayGenerator rg,
+    vec3 x_s,
+    vec3 n_s,
+    vec3 Lo,
+    float weight,
+    uint M,
+    inout float weight_sum,
+    inout uint M_sum) {
+    if (M == 0 || weight <= EPS || isnan(weight) || isinf(weight) || !finite_vec3(Lo)) return;
+    weight_sum += weight;
+    if (random() < weight / weight_sum) {
         rg.temporal_x_v = rg.initial_x_v;
         rg.temporal_n_v = rg.initial_n_v;
-        rg.temporal_x_s = rg.initial_x_s;
-        rg.temporal_n_s = rg.initial_n_s;
-        rg.temporal_Lo = rg.initial_Lo;
+        rg.temporal_x_s = x_s;
+        rg.temporal_n_s = n_s;
+        rg.temporal_Lo = Lo;
     }
-    float phat_z = luminance(rg.temporal_Lo);
-    rg.temporal_W = rg.temporal_w / (float(rg.temporal_M) * phat_z);
+    M_sum += M;
+}
+
+void temporal_resample() {
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    clear_temporal(rg);
+    if (!valid_primary_hit(rg)) {
+        raygenIn[gl_GlobalInvocationID.x] = rg;
+        return;
+    }
+
+    float weight_sum = 0.0;
+    uint M_sum = 0;
+
+    uint prev_idx = 0;
+    if (previous_pixel_for_current(rg.initial_x_v, prev_idx)) {
+        RayGenerator previous = previousRaygenIn[prev_idx];
+        if (compatible_previous_surface(rg, previous)) {
+            vec3 prev_x_s;
+            vec3 prev_n_s;
+            vec3 prev_Lo;
+            float prev_W;
+            uint prev_M;
+            if (get_previous_reservoir(rg, previous, prev_x_s, prev_n_s, prev_Lo, prev_W, prev_M) &&
+                visible_sample(rg.initial_x_v, rg.initial_n_v, prev_x_s)) {
+                float prev_phat = target_luminance(rg.initial_x_v, rg.initial_n_v, rg.initial_mat, prev_x_s, prev_Lo);
+                float prev_weight = prev_phat * prev_W * float(prev_M);
+                merge_temporal_candidate(
+                    rg,
+                    prev_x_s,
+                    prev_n_s,
+                    prev_Lo,
+                    prev_weight,
+                    prev_M,
+                    weight_sum,
+                    M_sum);
+            }
+        }
+    }
+
+    if (valid_initial_candidate(rg)) {
+        float current_phat = target_luminance(rg.initial_x_v, rg.initial_n_v, rg.initial_mat, rg.initial_x_s, rg.initial_Lo);
+        float current_weight = current_phat / rg.initial_pdf;
+        merge_temporal_candidate(
+            rg,
+            rg.initial_x_s,
+            rg.initial_n_s,
+            rg.initial_Lo,
+            current_weight,
+            1u,
+            weight_sum,
+            M_sum);
+    }
+
+    if (M_sum == 0 || weight_sum <= EPS || !finite_vec3(rg.temporal_Lo)) {
+        clear_temporal(rg);
+        raygenIn[gl_GlobalInvocationID.x] = rg;
+        return;
+    }
+
+    if (M_sum > ubo.contributioncap) {
+        float oldM = float(M_sum);
+        M_sum = ubo.contributioncap;
+        weight_sum *= float(M_sum) / oldM;
+    }
+
+    rg.temporal_w = weight_sum;
+    rg.temporal_M = M_sum;
+    float phat_z = target_luminance(rg.temporal_x_v, rg.temporal_n_v, rg.initial_mat, rg.temporal_x_s, rg.temporal_Lo);
+    if (phat_z <= EPS || !finite_vec3(rg.temporal_Lo)) {
+        rg.temporal_W = 0.0;
+    } else {
+        rg.temporal_W = rg.temporal_w / (float(rg.temporal_M) * phat_z);
+    }
     raygenIn[gl_GlobalInvocationID.x] = rg;
 }
 
 void main() {
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
-	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
+    if (!restir_enabled()) return;
     temporal_resample();
 }

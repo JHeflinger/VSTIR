@@ -9,6 +9,7 @@
 namespace VSTIR {
 
     struct RayGenerator {
+        alignas(16) glm::vec3 rawaccumulation;
         alignas(16) glm::vec3 accumulation;
         alignas(16) glm::vec3 initial_x_v;
         alignas(16) glm::vec3 initial_n_v;
@@ -34,6 +35,7 @@ namespace VSTIR {
         alignas(4) uint32_t spacial_M;
         alignas(4) float spacial_W;
         alignas(16) glm::vec3 direct;
+        alignas(16) glm::vec3 filtered;
     };
 
     typedef enum {
@@ -144,6 +146,8 @@ namespace VSTIR {
         alignas(4) uint32_t spacecount;
         alignas(4) uint32_t emissivecount;
         alignas(4) uint32_t directlighting;
+        alignas(4) uint32_t divider;
+        alignas(4) uint32_t filters;
     };
 
     struct VulkanSwapchain {

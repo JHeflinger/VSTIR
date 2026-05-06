@@ -52,6 +52,7 @@ struct Material {
 };
 
 struct RayGenerator {
+    vec3 rawaccumulation;
     vec3 accumulation;
     vec3 initial_x_v;
     vec3 initial_n_v;
@@ -77,6 +78,7 @@ struct RayGenerator {
     uint spacial_M;
     float spacial_W;
     vec3 direct;
+    vec3 filtered;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -101,6 +103,8 @@ layout(binding = 0) uniform UniformBufferObject {
     uint spacecount;
     uint emissivecount;
     uint directlighting;
+    uint divider;
+    uint filters;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -530,10 +534,11 @@ void initialize_sample(int rx, int ry) {
     } else {
         rg.initial_mat = 0;
         rg.initial_x_v = vec3(0.0);
-        rg.initial_n_v = vec3(0.0);
         rg.initial_x_s = vec3(0.0);
         rg.initial_n_s = vec3(0.0);
         rg.initial_Lo = vec3(0.0);
+        rg.temporal_Lo = vec3(0.0);
+        rg.spacial_Lo = vec3(0.0);
         hard_reset();
     }
     raygenIn[gl_GlobalInvocationID.x] = rg;

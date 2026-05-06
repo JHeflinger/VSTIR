@@ -721,6 +721,9 @@ namespace VSTIR {
         ImGui::Text("  NEE:");
         ImGui::SameLine();
         ImGui::Checkbox("##nee", &render_settings.directlighting);
+        ImGui::Text("  Bilateral:");
+        ImGui::SameLine();
+        ImGui::Checkbox("##bilateral", &render_settings.bilateral);
 
         ImGui::Spacing();
     }

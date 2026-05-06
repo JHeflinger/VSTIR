@@ -203,6 +203,13 @@ namespace VSTIR {
             ubo.previousvpm = vpm;
         }
 
+        // divider
+        ubo.divider = render_settings.resolution_scale * _viewport_width / 2.0f;
+
+        // filters
+        ubo.filters = 0;
+        ubo.filters |= render_settings.bilateral ? 1 : 0;
+
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 

@@ -1,0 +1,62 @@
+version: 1
+name: sample_scene
+
+camera:
+  position: [0.0, 2.133, 2.11]
+  look: [0.0, 0.0, 1.0]
+  up: [0.0, 1.0, 0.0]
+  fov_degrees: 90.0
+  orbiting: true
+  orbit_target: [0.0, 0.0, 0.0]
+
+lights:
+  - name: light_1
+    type: emissive_quad
+    # Local quad is centered at origin on the XY plane.
+    # width/height are in world units after transform scale.
+    width: 0.75
+    height: 0.75
+    emission: [18.0, 18.0, 18.0]
+    transform:
+      translation: [0.0, 1.95, 0.0]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+
+  - name: light_2
+    type: emissive_quad
+    # Local quad is centered at origin on the XY plane.
+    # width/height are in world units after transform scale.
+    width: 0.75
+    height: 0.75
+    emission: [18.0, 18.0, 18.0]
+    transform:
+      translation: [-5.0, 0.0, 0.0]
+      rotation_degrees_xyz: [0.0, 90.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+
+  - name: light_3
+    type: emissive_quad
+    # Local quad is centered at origin on the XY plane.
+    # width/height are in world units after transform scale.
+    width: 0.75
+    height: 0.75
+    emission: [18.0, 18.0, 18.0]
+    transform:
+      translation: [5.0, 0, 0.0]
+      rotation_degrees_xyz: [0.0, 90.0, 0.0]
+      scale: [1.0, 1.0, 1.0]
+
+meshes:
+  - name: dragon
+    obj: ../models/870k_dragon.glb
+    transform:
+      translation: [0.0, 0.0, 0.0]
+      rotation_degrees_xyz: [-90, 0.0, 145.0]
+      scale: [1, 1, 1]
+    material:
+      Kd: [ 0.7, 0.9, 1.0 ]
+      Ks: [ 1.0, 1.0, 1.0 ]
+      Tf: [ 0.905, 0.63, 0.3 ]
+      Ni: 1.45
+      Ns: 900.0
+      illum: 2

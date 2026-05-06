@@ -76,6 +76,13 @@ layout(binding = 0) uniform UniformBufferObject {
     uint directlighting;
     uint divider;
     uint filters;
+    uint restir;
+    uint showdivider;
+    uint directlightingright;
+    uint filtersright;
+    uint restirright;
+    uint restirframes;
+    uint resetreservoirs;
 } ubo;
 
 layout(binding = 1) buffer RayGeneratorSSBOIn {
@@ -98,16 +105,41 @@ float luminance(vec3 c) {
     return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
 }
 
+bool finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+bool right_side_x(int x) {
+    return ubo.showdivider != 0 && x > int(ubo.divider);
+}
+
+bool right_side() {
+    return right_side_x(int(gl_GlobalInvocationID.x % uint(ubo.width)));
+}
+
+bool restir_enabled() {
+    return (right_side() ? ubo.restirright : ubo.restir) != 0;
+}
+
+bool filter_enabled() {
+    return ((right_side() ? ubo.filtersright : ubo.filters) & 1u) != 0;
+}
+
+float surface_distance(vec3 origin, vec3 normal, vec3 p) {
+    return abs(dot(p - origin, normal));
+}
+
 void decompose_resevoir(uint idx, out vec3 indirect, out vec3 direct) {
     RayGenerator rg = raygenIn[idx];
     direct = rg.direct;
     if (rg.initial_pdf == 1.0) {
-        indirect = rg.spacial_Lo;
+        indirect = finite_vec3(rg.spacial_Lo) ? rg.spacial_Lo : vec3(0.0);
         return;
     }
     if (rg.spacial_M == 0 || rg.spacial_W <= 0.0 ||
         rg.spacial_x_s == rg.spacial_x_v ||
-        length(ubo.position - rg.spacial_x_v) < EPS) {
+        length(ubo.position - rg.spacial_x_v) < EPS ||
+        !finite_vec3(rg.spacial_Lo)) {
         indirect = vec3(0.0);
         return;
     }
@@ -119,9 +151,10 @@ void decompose_resevoir(uint idx, out vec3 indirect, out vec3 direct) {
          pow(max(dot(reflect(-wo, rg.spacial_n_v), wi), 0.0), mat.shiny))) *
         max(dot(wi, rg.spacial_n_v), 0.0);
     indirect = brdf_cos * rg.spacial_Lo * rg.spacial_W;
+    if (!finite_vec3(indirect)) indirect = vec3(0.0);
 }
 
-vec3 bilateral_kernel(int rx, int ry, int stride, vec3 centre_colour, vec3 centre_normal, float centre_depth, float sigma_lum, bool use_confidence, bool is_level0) {
+vec3 bilateral_kernel(int rx, int ry, int stride, vec3 centre_colour, vec3 centre_position, vec3 centre_normal, float sigma_lum, bool use_confidence, bool is_level0) {
     float inv2SigSpatSq = 1.0 / (2.0 * SIGMA_SPATIAL * SIGMA_SPATIAL);
     float inv2SigDepSq = 1.0 / (2.0 * SIGMA_DEPTH * SIGMA_DEPTH);
     float inv2SigLumSq = 1.0 / (2.0 * sigma_lum * sigma_lum);
@@ -134,6 +167,7 @@ vec3 bilateral_kernel(int rx, int ry, int stride, vec3 centre_colour, vec3 centr
             int ny = ry + dy * stride;
             if (nx < 0 || nx >= int(ubo.width) ||
                 ny < 0 || ny >= int(ubo.height)) continue;
+            if (ubo.showdivider != 0 && right_side_x(nx) != right_side_x(rx)) continue;
             uint nIdx = uint(ny) * uint(ubo.width) + uint(nx);
             RayGenerator nb = raygenIn[nIdx];
             if (nb.initial_n_v == vec3(0.0)) continue;
@@ -148,10 +182,9 @@ vec3 bilateral_kernel(int rx, int ry, int stride, vec3 centre_colour, vec3 centr
             if (any(isnan(nb_colour)) || any(isinf(nb_colour))) continue;
             float dist2 = float(dx * dx + dy * dy);
             float w_spatial = exp(-dist2 * inv2SigSpatSq);
-            float ndot = max(dot(centre_normal, nb.spacial_n_v), 0.0);
+            float ndot = max(dot(centre_normal, nb.initial_n_v), 0.0);
             float w_normal = pow(ndot, SIGMA_NORMAL);
-            float nb_depth = length(nb.spacial_x_v - ubo.position);
-            float depth_diff = abs(centre_depth - nb_depth) / (centre_depth + EPS);
+            float depth_diff = surface_distance(centre_position, centre_normal, nb.initial_x_v);
             float w_depth = exp(-depth_diff * depth_diff * inv2SigDepSq);
             float nb_log_lum = log(luminance(nb_colour) + 1.0);
             float lum_diff = centre_log_lum - nb_log_lum;
@@ -171,11 +204,11 @@ vec3 bilateral_kernel(int rx, int ry, int stride, vec3 centre_colour, vec3 centr
 }
 
 void main() {
-    if (ubo.filters == 0) return;
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
     int rx = int(gl_GlobalInvocationID.x % uint(ubo.width));
     int ry = int(gl_GlobalInvocationID.x / uint(ubo.width));
+    if (!restir_enabled() || !filter_enabled()) return;
     uint cIdx = gl_GlobalInvocationID.x;
     RayGenerator center = raygenIn[cIdx];
     int stride = 1 << int(pc.atrous_level);
@@ -190,8 +223,8 @@ void main() {
         return;
     }
 
-    vec3 centre_normal = center.spacial_n_v;
-    float centre_depth = length(center.spacial_x_v - ubo.position);
+    vec3 centre_position = center.initial_x_v;
+    vec3 centre_normal = center.initial_n_v;
     vec3 centre_colour;
 
     if (is_level0) {
@@ -199,18 +232,18 @@ void main() {
         decompose_resevoir(cIdx, centre_indirect, centre_direct);
         vec3 filtered_indirect = bilateral_kernel(
             rx, ry, stride,
-            centre_indirect, centre_normal, centre_depth,
+            centre_indirect, centre_position, centre_normal,
             SIGMA_LUM_INDIRECT, true, true);
         vec3 filtered_direct = bilateral_kernel(
             rx, ry, stride,
-            centre_direct, centre_normal, centre_depth,
+            centre_direct, centre_position, centre_normal,
             SIGMA_LUM_DIRECT, false, true);
         centre_colour = filtered_indirect + filtered_direct;
     } else {
         centre_colour = center.filtered;
         centre_colour = bilateral_kernel(
             rx, ry, stride,
-            centre_colour, centre_normal, centre_depth,
+            centre_colour, centre_position, centre_normal,
             SIGMA_LUM_INDIRECT, true, false);
     }
 

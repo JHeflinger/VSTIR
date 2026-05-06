@@ -32,6 +32,8 @@ namespace VSTIR {
         int candidatecap = 2;
         int spacerange = 5;
         int spacecount = 5;
+        bool bilateral = false;
+        bool directlighting = true;
     };
 
     class Renderer {

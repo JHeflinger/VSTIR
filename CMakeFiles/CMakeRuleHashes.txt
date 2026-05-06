@@ -19,12 +19,14 @@ fc5ece1af87ca9fbb859942a4db5c725 _deps/glfw-build/src/xdg-activation-v1-client-p
 15acb8ecc2e5f8e4997103522fff74f9 _deps/glfw-build/src/xdg-decoration-unstable-v1-client-protocol.h
 4a8db2ef03ca09db69301ae6e8c05ffe _deps/glfw-build/src/xdg-shell-client-protocol-code.h
 fd06d7237fcbe5637e2bb0f90711f7a3 _deps/glfw-build/src/xdg-shell-client-protocol.h
+a79c7081401f1acd20ba8465a88162f8 bin/shaders/bilateral.comp.spv
 c19c72fbbecfffd19103893af6d6c344 bin/shaders/combine_components.comp.spv
 b9d53b3e8c87338707b43e2d76d5c744 bin/shaders/compile.comp.spv
 91822163b9fb11671d5d9341ab194b4e bin/shaders/haar_horizontal.comp.spv
 374ee72beb6638c7cbe027a63b903aaa bin/shaders/haar_vertical.comp.spv
 1ed19f48788c130494ffab469ad5d254 bin/shaders/inv_haar_horizontal.comp.spv
 feec0e657548f5828dda437ccc134ac4 bin/shaders/inv_haar_vertical.comp.spv
+0ea35a30ef0390367bead7c1707fe901 bin/shaders/merge.comp.spv
 c090d62ec9066aa6f595c769e4e84028 bin/shaders/render.comp.spv
 cdeae27640fd20c00e6edff918aad443 bin/shaders/resevoir.comp.spv
 fd7d53183f410155f93be53baa2c4225 bin/shaders/separate_components.comp.spv

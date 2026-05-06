@@ -66,12 +66,14 @@ include shaders/CMakeFiles/Shaders.dir/compiler_depend.make
 # Include the progress variables for this target.
 include shaders/CMakeFiles/Shaders.dir/progress.make
 
+shaders/CMakeFiles/Shaders: bin/shaders/bilateral.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/combine_components.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/compile.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/haar_horizontal.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/haar_vertical.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/inv_haar_horizontal.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/inv_haar_vertical.comp.spv
+shaders/CMakeFiles/Shaders: bin/shaders/merge.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/render.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/resevoir.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/separate_components.comp.spv
@@ -81,85 +83,97 @@ shaders/CMakeFiles/Shaders: bin/shaders/sync_buffers.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/temporal.comp.spv
 shaders/CMakeFiles/Shaders: bin/shaders/threshold.comp.spv
 
+bin/shaders/bilateral.comp.spv: shaders/bilateral.comp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Generating ../bin/shaders/bilateral.comp.spv"
+	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
+	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/bilateral.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/bilateral.comp.spv
+
 bin/shaders/combine_components.comp.spv: shaders/combine_components.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Generating ../bin/shaders/combine_components.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Generating ../bin/shaders/combine_components.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/combine_components.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/combine_components.comp.spv
 
 bin/shaders/compile.comp.spv: shaders/compile.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Generating ../bin/shaders/compile.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Generating ../bin/shaders/compile.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/compile.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/compile.comp.spv
 
 bin/shaders/haar_horizontal.comp.spv: shaders/haar_horizontal.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Generating ../bin/shaders/haar_horizontal.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Generating ../bin/shaders/haar_horizontal.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/haar_horizontal.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/haar_horizontal.comp.spv
 
 bin/shaders/haar_vertical.comp.spv: shaders/haar_vertical.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Generating ../bin/shaders/haar_vertical.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Generating ../bin/shaders/haar_vertical.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/haar_vertical.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/haar_vertical.comp.spv
 
 bin/shaders/inv_haar_horizontal.comp.spv: shaders/inv_haar_horizontal.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Generating ../bin/shaders/inv_haar_horizontal.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Generating ../bin/shaders/inv_haar_horizontal.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/inv_haar_horizontal.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/inv_haar_horizontal.comp.spv
 
 bin/shaders/inv_haar_vertical.comp.spv: shaders/inv_haar_vertical.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Generating ../bin/shaders/inv_haar_vertical.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Generating ../bin/shaders/inv_haar_vertical.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/inv_haar_vertical.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/inv_haar_vertical.comp.spv
 
+bin/shaders/merge.comp.spv: shaders/merge.comp
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Generating ../bin/shaders/merge.comp.spv"
+	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
+	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/merge.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/merge.comp.spv
+
 bin/shaders/render.comp.spv: shaders/render.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Generating ../bin/shaders/render.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Generating ../bin/shaders/render.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/render.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/render.comp.spv
 
 bin/shaders/resevoir.comp.spv: shaders/resevoir.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Generating ../bin/shaders/resevoir.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Generating ../bin/shaders/resevoir.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/resevoir.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/resevoir.comp.spv
 
 bin/shaders/separate_components.comp.spv: shaders/separate_components.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Generating ../bin/shaders/separate_components.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Generating ../bin/shaders/separate_components.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/separate_components.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/separate_components.comp.spv
 
 bin/shaders/sort_iteration.comp.spv: shaders/sort_iteration.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Generating ../bin/shaders/sort_iteration.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Generating ../bin/shaders/sort_iteration.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/sort_iteration.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/sort_iteration.comp.spv
 
 bin/shaders/spacial.comp.spv: shaders/spacial.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Generating ../bin/shaders/spacial.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Generating ../bin/shaders/spacial.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/spacial.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/spacial.comp.spv
 
 bin/shaders/sync_buffers.comp.spv: shaders/sync_buffers.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Generating ../bin/shaders/sync_buffers.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Generating ../bin/shaders/sync_buffers.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/sync_buffers.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/sync_buffers.comp.spv
 
 bin/shaders/temporal.comp.spv: shaders/temporal.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Generating ../bin/shaders/temporal.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_15) "Generating ../bin/shaders/temporal.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/temporal.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/temporal.comp.spv
 
 bin/shaders/threshold.comp.spv: shaders/threshold.comp
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Generating ../bin/shaders/threshold.comp.spv"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --blue --bold --progress-dir=/home/aamen/school/spring26/graphics/VSTIR/CMakeFiles --progress-num=$(CMAKE_PROGRESS_16) "Generating ../bin/shaders/threshold.comp.spv"
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /usr/bin/cmake -E make_directory /home/aamen/school/spring26/graphics/VSTIR/bin/shaders
 	cd /home/aamen/school/spring26/graphics/VSTIR/shaders && /bin/glslc /home/aamen/school/spring26/graphics/VSTIR/shaders/threshold.comp -o /home/aamen/school/spring26/graphics/VSTIR/bin/shaders/threshold.comp.spv
 
 shaders/CMakeFiles/Shaders.dir/codegen:
 .PHONY : shaders/CMakeFiles/Shaders.dir/codegen
 
+Shaders: bin/shaders/bilateral.comp.spv
 Shaders: bin/shaders/combine_components.comp.spv
 Shaders: bin/shaders/compile.comp.spv
 Shaders: bin/shaders/haar_horizontal.comp.spv
 Shaders: bin/shaders/haar_vertical.comp.spv
 Shaders: bin/shaders/inv_haar_horizontal.comp.spv
 Shaders: bin/shaders/inv_haar_vertical.comp.spv
+Shaders: bin/shaders/merge.comp.spv
 Shaders: bin/shaders/render.comp.spv
 Shaders: bin/shaders/resevoir.comp.spv
 Shaders: bin/shaders/separate_components.comp.spv

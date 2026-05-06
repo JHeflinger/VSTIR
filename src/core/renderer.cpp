@@ -561,6 +561,7 @@ namespace VSTIR {
                 state.normals.size() > 0 && state.faces[i].normals ? (uint32_t)normals_start + state.faces[i].cn : (uint32_t)-1,
                 current_material
             };
+            if (m_Geometry.materials[current_material].emission != glm::vec3(0.0f)) m_Geometry.emissives.push_back(m_Geometry.triangles.size());
             m_Geometry.triangles.push_back(triangle);
         }
         return true;
@@ -741,38 +742,45 @@ namespace VSTIR {
             shader_name_idx_map["temporal"] = 2;
             shader_name_idx_map["spacial"] = 3;
             shader_name_idx_map["compile"] = 4;
-            shader_name_idx_map["sync"] = 5;
-            shader_name_idx_map["separate"] = 6;
-            shader_name_idx_map["sort"] = 7;
-            shader_name_idx_map["threshold"] = 8;
-            shader_name_idx_map["haar_horizontal"] = 9;
-            shader_name_idx_map["haar_vertical"] = 10;
-            shader_name_idx_map["inv_haar_horizontal"] = 11;
-            shader_name_idx_map["inv_haar_vertical"] = 12;
-            shader_name_idx_map["combine"] = 13;
+            shader_name_idx_map["bilateral"] = 5;
+            shader_name_idx_map["merge"] = 6;
+            shader_name_idx_map["sync"] = 7;
+            shader_name_idx_map["separate"] = 8;
+            shader_name_idx_map["sort"] = 9;
+            shader_name_idx_map["threshold"] = 10;
+            shader_name_idx_map["haar_horizontal"] = 11;
+            shader_name_idx_map["haar_vertical"] = 12;
+            shader_name_idx_map["inv_haar_horizontal"] = 13;
+            shader_name_idx_map["inv_haar_vertical"] = 14;
+            shader_name_idx_map["combine"] = 15;
         }
         float max_w = std::max(_render_width, _render_height);
         max_w = std::pow(2, std::ceil(log2(max_w)));
 
         // execute shader stages
         std::vector<int> shader_idxs;
-        if (m_settings.restir)
+        //if (m_settings.restir)
         {
+            shader_idxs.push_back(shader_name_idx_map["render"]);
             shader_idxs.push_back(shader_name_idx_map["resevoir"]);
-            if (m_settings.temporal)
+            //if (m_settings.temporal)
             {
                 shader_idxs.push_back(shader_name_idx_map["temporal"]);
             }
-            if (m_settings.spacial)
+           // if (m_settings.spacial)
             {
                 shader_idxs.push_back(shader_name_idx_map["spacial"]);
             }
             shader_idxs.push_back(shader_name_idx_map["compile"]);
+            shader_idxs.push_back(shader_name_idx_map["bilateral"]);
+            shader_idxs.push_back(shader_name_idx_map["merge"]);
         }
+        /*
         else 
         {
             shader_idxs.push_back(shader_name_idx_map["render"]);
         }
+        */
         if (m_settings.denoiser)
         {
             int levels = log2(max_w);
@@ -803,28 +811,43 @@ namespace VSTIR {
             shader_idxs.push_back(shader_name_idx_map["combine"]);
         }
         
+
+        uint32_t atrous_passes = 4;
+        uint32_t curr_filter_passes = 0;
         for (auto i : shader_idxs) {
             uint32_t invocations = 
-                (_render_width * _render_height) * (i < 5)
-                + (max_w * max_w) * !(i < 5);
-
+                (_render_width * _render_height) * (i < 7)
+                + (max_w * max_w) * !(i < 7);
+            if (i == shader_name_idx_map["bilateral"]) {
+                uint32_t pc = curr_filter_passes;
+                vkCmdPushConstants(
+                        _scheduler.Commands().command,
+                        _context.Pipeline().layout[i],
+                        VK_SHADER_STAGE_COMPUTE_BIT,
+                        0, sizeof(uint32_t), &pc);
+            }
             vkCmdBindPipeline(
-                _scheduler.Commands().command,
-                VK_PIPELINE_BIND_POINT_COMPUTE,
-                _context.Pipeline().pipeline[i]);
+                    _scheduler.Commands().command,
+                    VK_PIPELINE_BIND_POINT_COMPUTE,
+                    _context.Pipeline().pipeline[i]);
             vkCmdBindDescriptorSets(
-                _scheduler.Commands().command,
-                VK_PIPELINE_BIND_POINT_COMPUTE,
-                _context.Pipeline().layout[i],
-                0,
-                1,
-                &(_data.Descriptors()[i].set),
-                0,
-                nullptr);
+                    _scheduler.Commands().command,
+                    VK_PIPELINE_BIND_POINT_COMPUTE,
+                    _context.Pipeline().layout[i],
+                    0,
+                    1,
+                    &(_data.Descriptors()[i].set),
+                    0,
+                    nullptr);
             int x = WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE);
             int y = 1;
             vkCmdDispatch(_scheduler.Commands().command, x, y, 1);
             VUTILS::RecordGeneralBarrier(_scheduler.Commands().command);
+            //if (i > 4 && i < _shaders.size() - 1) {
+            if (i == shader_name_idx_map["bilateral"]) {
+                curr_filter_passes++;
+                if (curr_filter_passes < atrous_passes) i--;
+            }
         }
 
         // Copy image to staging

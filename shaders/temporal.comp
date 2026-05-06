@@ -33,33 +33,6 @@ struct Hit {
     vec3 position;
 };
 
-struct RayGenerator {
-    vec3 accumulation;
-    vec3 wpos;
-    vec3 wnorm;
-    uint matid;
-    uint hitid;
-    vec3 ypos;
-    vec3 ynorm;
-    vec3 yradiance;
-    float W;
-    float wsum;
-    uint M;
-    vec3 pypos;
-    vec3 pynorm;
-    vec3 pyradiance;
-    float pW;
-    float pwsum;
-    uint pM;
-    float pdepth;
-    vec3 pnorm;
-    float w_initial;
-    vec3 pos_initial;
-    vec3 normal_initial;
-    vec3 radiance_initial;
-    float W_initial;
-};
-
 struct Material {
     vec3 emission;
     vec3 ambient;
@@ -71,6 +44,36 @@ struct Material {
     float shiny;
     uint model;
 };
+struct RayGenerator {
+    vec3 rawaccumulation;
+    vec3 accumulation;
+    vec3 initial_x_v;
+    vec3 initial_n_v;
+    vec3 initial_x_s;
+    vec3 initial_n_s;
+    vec3 initial_Lo;
+    float initial_pdf;
+    uint initial_mat;
+    vec3 temporal_x_v;
+    vec3 temporal_n_v;
+    vec3 temporal_x_s;
+    vec3 temporal_n_s;
+    vec3 temporal_Lo;
+    float temporal_w;
+    uint temporal_M;
+    float temporal_W;
+    vec3 spacial_x_v;
+    vec3 spacial_n_v;
+    vec3 spacial_x_s;
+    vec3 spacial_n_s;
+    vec3 spacial_Lo;
+    float spacial_w;
+    uint spacial_M;
+    float spacial_W;
+    vec3 direct;
+    vec3 filtered;
+};
+
 
 layout(binding = 0) uniform UniformBufferObject {
     vec3 look;
@@ -92,9 +95,14 @@ layout(binding = 0) uniform UniformBufferObject {
     uint candidatecap;
     uint spacerange;
     uint spacecount;
-    uint buffer_idx;
+
     float denoise_bias;
     float max_width;
+
+    uint emissivecount;
+    uint directlighting;
+    uint divider;
+    uint filters;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -240,36 +248,40 @@ vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, i
         (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
         max(0.0, dot(incoming, normal));
 }
+
 float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
-void temporal_merge() {
+
+float diffuse_pdf(vec3 normal, vec3 incoming) {
+    return max(0.0, dot(normal, incoming)) / PI;
+}
+
+float specular_pdf(vec3 incoming, vec3 R, float shiny) {
+    float cosalpha = max(dot(R, incoming), 0.0);
+    return (shiny + 1.0) * pow(cosalpha, shiny) / (2.0 * PI);
+}
+
+float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal) { //TODO: this does not consider specular lobe, fix later
+    return diffuse_pdf(normal, incoming);
+}
+
+void temporal_resample() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
-
-    // reproject onto previous camera coordinate
-    vec4 clip = ubo.previousvpm * vec4(rg.wpos, 1.0);
-    if (clip.w <= 0) return;
-    vec3 ndc = clip.xyz / clip.w;
-    vec2 uv = vec2(ndc.x * 0.5 + 0.5, ndc.y * 0.5 + 0.5);
-    if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1) return;
-    ivec2 pp = ivec2(uv * vec2(ubo.width, ubo.height));
-    RayGenerator pg = raygenIn[int(pp.y * ubo.width + pp.x)];
-    // clamp previous frame contirbution
-
-
-    pg.M = min(pg.M, ubo.contributioncap);
-
-    // update resevoirs
-    rg.pM += pg.M;
-    float w_prev = pg.wsum;
-    rg.pwsum += w_prev;
-    if (random() < w_prev / rg.pwsum) {
-        rg.pypos = pg.ypos;
-        rg.pynorm = pg.ynorm;
-        rg.pyradiance = pg.yradiance;
-        rg.pW = pg.W;
+    float phat = luminance(rg.initial_Lo);
+    if (rg.initial_pdf == 0) return;
+    float w = phat / rg.initial_pdf;
+    rg.temporal_w += w;
+    rg.temporal_M += 1;
+    if (random() < w / rg.temporal_w) {
+        rg.temporal_x_v = rg.initial_x_v;
+        rg.temporal_n_v = rg.initial_n_v;
+        rg.temporal_x_s = rg.initial_x_s;
+        rg.temporal_n_s = rg.initial_n_s;
+        rg.temporal_Lo = rg.initial_Lo;
     }
-
+    float phat_z = luminance(rg.temporal_Lo);
+    rg.temporal_W = rg.temporal_w / (float(rg.temporal_M) * phat_z);
     raygenIn[gl_GlobalInvocationID.x] = rg;
 }
 
@@ -279,5 +291,5 @@ void main() {
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
-    temporal_merge();
+    temporal_resample();
 }

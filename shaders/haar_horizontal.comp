@@ -23,9 +23,14 @@ layout(binding = 0) uniform UniformBufferObject {
     uint candidatecap;
     uint spacerange;
     uint spacecount;
-    uint buffer_idx;
+
     float denoise_bias;
     float max_width;
+
+    uint emissivecount;
+    uint directlighting;
+    uint divider;
+    uint filters;
 } ubo;
 
 

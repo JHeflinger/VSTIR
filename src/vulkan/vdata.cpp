@@ -265,7 +265,6 @@ namespace VSTIR {
         ubo.candidatecap = (uint32_t)render_settings.candidatecap;
         ubo.spacerange = (uint32_t)render_settings.spacerange;
         ubo.spacecount = (uint32_t)render_settings.spacecount;
-        ubo.buffer_idx = (!render_settings.spacial && render_settings.temporal);
 
         // Camera
         ubo.fov = glm::radians(_renderer.GetCamera().Fov());
@@ -283,6 +282,10 @@ namespace VSTIR {
             max_w = std::pow(2, std::ceil(log2(max_w)));
             ubo.max_width = max_w;
         }
+        // emissives
+        ubo.emissivecount = _renderer.GetGeometry().emissives.size();
+        ubo.directlighting = render_settings.directlighting ? 1 : 0;
+
         // View matrix
         static glm::mat4 vpm;
         static bool first_vpm = true;
@@ -295,6 +298,13 @@ namespace VSTIR {
             first_vpm = false;
             ubo.previousvpm = vpm;
         }
+
+        // divider
+        ubo.divider = _viewport_width / 2.0f;
+
+        // filters
+        ubo.filters = 0;
+        ubo.filters |= render_settings.bilateral ? 1 : 0;
 
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }

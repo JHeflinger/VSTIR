@@ -1,10 +1,12 @@
 file(REMOVE_RECURSE
+  "../bin/shaders/bilateral.comp.spv"
   "../bin/shaders/combine_components.comp.spv"
   "../bin/shaders/compile.comp.spv"
   "../bin/shaders/haar_horizontal.comp.spv"
   "../bin/shaders/haar_vertical.comp.spv"
   "../bin/shaders/inv_haar_horizontal.comp.spv"
   "../bin/shaders/inv_haar_vertical.comp.spv"
+  "../bin/shaders/merge.comp.spv"
   "../bin/shaders/render.comp.spv"
   "../bin/shaders/resevoir.comp.spv"
   "../bin/shaders/separate_components.comp.spv"

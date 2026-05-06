@@ -734,8 +734,18 @@ namespace VSTIR {
         ASSERT(result == VK_SUCCESS, "Failed to begin recording command buffer!");
 
         // execute shader stages
+        uint32_t atrous_passes = 4;
+        uint32_t curr_filter_passes = 0;
         for (size_t i = 0; i < _shaders.size(); i++) {
             uint32_t invocations = _render_width * _render_height;
+            if (i > 4 && i < _shaders.size() - 1) {
+                uint32_t pc = curr_filter_passes;
+                vkCmdPushConstants(
+                    _scheduler.Commands().command,
+                    _context.Pipeline().layout[i],
+                    VK_SHADER_STAGE_COMPUTE_BIT,
+                    0, sizeof(uint32_t), &pc);
+            }
             vkCmdBindPipeline(
                 _scheduler.Commands().command,
                 VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -751,6 +761,10 @@ namespace VSTIR {
                 nullptr);
             vkCmdDispatch(_scheduler.Commands().command, WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE), 1, 1);
             VUTILS::RecordGeneralBarrier(_scheduler.Commands().command);
+            if (i > 4 && i < _shaders.size() - 1) {
+                curr_filter_passes++;
+                if (curr_filter_passes < atrous_passes) i--;
+            }
         }
 
         // Copy image to staging

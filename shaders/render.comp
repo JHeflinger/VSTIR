@@ -78,6 +78,7 @@ struct RayGenerator {
     uint spacial_M;
     float spacial_W;
     vec3 direct;
+    vec3 filtered;
 };
 
 layout(binding = 0) uniform UniformBufferObject {

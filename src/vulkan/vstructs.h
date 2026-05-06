@@ -35,6 +35,7 @@ namespace VSTIR {
         alignas(4) uint32_t spacial_M;
         alignas(4) float spacial_W;
         alignas(16) glm::vec3 direct;
+        alignas(16) glm::vec3 filtered;
     };
 
     typedef enum {

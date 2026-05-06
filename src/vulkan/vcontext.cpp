@@ -71,11 +71,17 @@ namespace VSTIR {
             createInfo.module = shadermodules[i];
             createInfo.pName = "main";
 
+            VkPushConstantRange pushRange = { 0 };
+            pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+            pushRange.offset = 0;
+            pushRange.size = sizeof(uint32_t);
+
             VkPipelineLayoutCreateInfo layoutInfo{};
             layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
             layoutInfo.setLayoutCount = 1;
             layoutInfo.pSetLayouts = &(m_Data.Descriptors()[i].layout);
-            layoutInfo.pushConstantRangeCount = 0;
+            layoutInfo.pushConstantRangeCount = 1;
+            layoutInfo.pPushConstantRanges = &pushRange;
 
             VkResult result = vkCreatePipelineLayout(_interface, &(layoutInfo), nullptr, &(m_Pipeline.layout[i]));
             if (result != VK_SUCCESS) FATAL("Failed to create pipeline layout!");

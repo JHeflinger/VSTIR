@@ -146,6 +146,7 @@ namespace VSTIR {
         alignas(4) uint32_t emissivecount;
         alignas(4) uint32_t directlighting;
         alignas(4) uint32_t divider;
+        alignas(4) uint32_t filters;
     };
 
     struct VulkanSwapchain {

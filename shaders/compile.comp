@@ -102,6 +102,7 @@ layout(binding = 0) uniform UniformBufferObject {
     uint emissivecount;
     uint directlighting;
     uint divider;
+    uint filters;
 } ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -347,6 +348,7 @@ vec3 compile_resevoir() {
 }
 
 void main() {
+    if (ubo.filters != 0) return;
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));

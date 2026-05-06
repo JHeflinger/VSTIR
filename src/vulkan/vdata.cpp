@@ -206,6 +206,10 @@ namespace VSTIR {
         // divider
         ubo.divider = _viewport_width / 2.0f;
 
+        // filters
+        ubo.filters = 0;
+        ubo.filters |= render_settings.bilateral ? 1 : 0;
+
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }
 

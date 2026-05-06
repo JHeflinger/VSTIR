@@ -684,9 +684,9 @@ namespace VSTIR {
 
         if (scaleMismatch) {
             _context.ResizeTarget();
-            _core.RecreateBridge();
             _data.RecreateSSBO();
             _render_settings.sample_count = 0;
+            _render_settings.restir_history_count = 0;
         }
 
         if (scaleMismatch) {
@@ -702,6 +702,8 @@ namespace VSTIR {
         if (!SceneLoader::LoadScene(filepath, m_Geometry)) {
             return;
         }
+        m_settings.sample_count = 0;
+        m_settings.restir_history_count = 0;
         m_Backend.Reconstruct();
     }
 
@@ -714,9 +716,26 @@ namespace VSTIR {
         // execute shader stages
         uint32_t atrous_passes = 4;
         uint32_t curr_filter_passes = 0;
+        const bool anyRestir =
+            _render_settings.show_divider ?
+            (_render_settings.restir || _render_settings.restir_right) :
+            _render_settings.restir;
+        const bool anyBilateral =
+            _render_settings.show_divider ?
+            ((_render_settings.restir && _render_settings.bilateral) ||
+             (_render_settings.restir_right && _render_settings.bilateral_right)) :
+            (_render_settings.restir && _render_settings.bilateral);
         for (size_t i = 0; i < _shaders.size(); i++) {
+            const bool isMergeStage = i == _shaders.size() - 1;
+            const bool isFilterStage = i > 4 && !isMergeStage;
+            if (!anyRestir && i != 0 && !isMergeStage) {
+                continue;
+            }
+            if (anyRestir && isFilterStage && !anyBilateral) {
+                continue;
+            }
             uint32_t invocations = _render_width * _render_height;
-            if (i > 4 && i < _shaders.size() - 1) {
+            if (isFilterStage) {
                 uint32_t pc = curr_filter_passes;
                 vkCmdPushConstants(
                     _scheduler.Commands().command,
@@ -739,13 +758,49 @@ namespace VSTIR {
                 nullptr);
             vkCmdDispatch(_scheduler.Commands().command, WorkgroupCount1D(invocations, INVOCATION_GROUP_SIZE), 1, 1);
             VUTILS::RecordGeneralBarrier(_scheduler.Commands().command);
-            if (i > 4 && i < _shaders.size() - 1) {
+            if (isFilterStage) {
                 curr_filter_passes++;
                 if (curr_filter_passes < atrous_passes) i--;
             }
         }
 
-        // Copy image to staging
+        // Snapshot the fully updated frame reservoirs for next frame's temporal ReSTIR pass.
+        {
+            VkDeviceSize reservoirBufferSize =
+                sizeof(RayGenerator) * _renderer.GetGeometry().raygen_size;
+            if (reservoirBufferSize > 0) {
+                VkMemoryBarrier beforeCopy{};
+                beforeCopy.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+                beforeCopy.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+                beforeCopy.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
+                vkCmdPipelineBarrier(
+                    _scheduler.Commands().command,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    0, 1, &beforeCopy, 0, nullptr, 0, nullptr);
+
+                VkBufferCopy copyRegion{};
+                copyRegion.size = reservoirBufferSize;
+                vkCmdCopyBuffer(
+                    _scheduler.Commands().command,
+                    _data.SSBO().buffer,
+                    _data.PreviousSSBO().buffer,
+                    1,
+                    &copyRegion);
+
+                VkMemoryBarrier afterCopy{};
+                afterCopy.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+                afterCopy.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+                afterCopy.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+                vkCmdPipelineBarrier(
+                    _scheduler.Commands().command,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                    0, 1, &afterCopy, 0, nullptr, 0, nullptr);
+            }
+        }
+
+        // Prepare shader output for the swapchain blit.
         {
             VkImageMemoryBarrier imgBarrier{};
             imgBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -766,20 +821,6 @@ namespace VSTIR {
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_PIPELINE_STAGE_TRANSFER_BIT,
                 0, 0, nullptr, 0, nullptr, 1, &imgBarrier);
-            VkBufferImageCopy region{};
-            region.bufferOffset = 0;
-            region.bufferRowLength = 0;
-            region.bufferImageHeight = 0;
-            region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            region.imageSubresource.mipLevel = 0;
-            region.imageSubresource.baseArrayLayer = 0;
-            region.imageSubresource.layerCount = 1;
-            region.imageOffset = (VkOffset3D){ 0, 0, 0 };
-            region.imageExtent = (VkExtent3D){ _render_width, _render_height, 1 };
-            vkCmdCopyImageToBuffer(
-                _scheduler.Commands().command,
-                _context.Target().image,
-                VK_IMAGE_LAYOUT_GENERAL, _core.Bridge().buffer, 1, &region);
         }
 
         // Blit image

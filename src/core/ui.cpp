@@ -675,7 +675,8 @@ namespace VSTIR {
         ImGui::Text("  Resolution Scale:");
         ImGui::SameLine();
 
-        ImGui::SliderFloat("##resscale", &render_settings.resolution_scale, 0.1f, 2.0f, "%.2fx");
+        bool render_settings_changed = false;
+        render_settings_changed |= ImGui::SliderFloat("##resscale", &render_settings.resolution_scale, 0.1f, 2.0f, "%.2fx");
 
         ImGui::Spacing();
 
@@ -686,7 +687,9 @@ namespace VSTIR {
 
         ImGui::Text("  Accumulate Samples:");
         ImGui::SameLine();
-        ImGui::Checkbox("##accum", &render_settings.accumulate_samples);
+        if (ImGui::Checkbox("##accum", &render_settings.accumulate_samples)) {
+            render_settings.sample_count = 0;
+        }
 
         if (render_settings.accumulate_samples) {
             ImGui::SameLine();
@@ -697,33 +700,53 @@ namespace VSTIR {
             }
         }
 
-        ImGui::Text("  ReSTIR GI:");
+        ImGui::Text("  Show Divider:");
         ImGui::SameLine();
-        ImGui::Checkbox("##restirgi", &render_settings.restir);
-        ImGui::Text("  Depth Threshold:");
-        ImGui::SameLine();
-        ImGui::SliderFloat("##dthres", &render_settings.depththreshold, 0.0f, 1.0f, "%.3f");
-        ImGui::Text("  Normal Threshold:");
-        ImGui::SameLine();
-        ImGui::SliderFloat("##nthres", &render_settings.normalthreshold, 0.0f, 1.0f, "%.3f");
-        ImGui::Text("  Contribution Cap:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##ccap", &render_settings.contributioncap, 1, 100);
-        ImGui::Text("  Candidate Cap:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##cancap", &render_settings.candidatecap, 1, 10);
-        ImGui::Text("  Spacial Sampling Range:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##ssrange", &render_settings.spacerange, 1, 100);
-        ImGui::Text("  Spacial Sampling Count:");
-        ImGui::SameLine();
-        ImGui::SliderInt("##sscount", &render_settings.spacecount, 1, 20);
-        ImGui::Text("  NEE:");
-        ImGui::SameLine();
-        ImGui::Checkbox("##nee", &render_settings.directlighting);
-        ImGui::Text("  Bilateral:");
-        ImGui::SameLine();
-        ImGui::Checkbox("##bilateral", &render_settings.bilateral);
+        render_settings_changed |= ImGui::Checkbox("##showdivider", &render_settings.show_divider);
+
+        auto toggle_row = [&](const char* label, const char* idLeft, bool* left, const char* idRight, bool* right) {
+            ImGui::Text("%s", label);
+            ImGui::SameLine(150.0f);
+            render_settings_changed |= ImGui::Checkbox(idLeft, left);
+            if (render_settings.show_divider) {
+                ImGui::SameLine();
+                ImGui::Text("L");
+                ImGui::SameLine();
+                render_settings_changed |= ImGui::Checkbox(idRight, right);
+                ImGui::SameLine();
+                ImGui::Text("R");
+            }
+        };
+
+        toggle_row("  ReSTIR GI:", "##restirgi_l", &render_settings.restir, "##restirgi_r", &render_settings.restir_right);
+        toggle_row("  NEE:", "##nee_l", &render_settings.directlighting, "##nee_r", &render_settings.directlighting_right);
+        toggle_row("  Bilateral:", "##bilateral_l", &render_settings.bilateral, "##bilateral_r", &render_settings.bilateral_right);
+
+        if (ImGui::TreeNodeEx("  ReSTIR GI Tuning", ImGuiTreeNodeFlags_DefaultOpen)) {
+            ImGui::Text("  Depth Threshold:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderFloat("##dthres", &render_settings.depththreshold, 0.0f, 1.0f, "%.3f");
+            ImGui::Text("  Normal Threshold:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderFloat("##nthres", &render_settings.normalthreshold, 0.0f, 1.0f, "%.3f");
+            ImGui::Text("  Contribution Cap:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderInt("##ccap", &render_settings.contributioncap, 1, 100);
+            ImGui::Text("  Candidate Cap:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderInt("##cancap", &render_settings.candidatecap, 1, 10);
+            ImGui::Text("  Spatial Sampling Range:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderInt("##ssrange", &render_settings.spacerange, 1, 100);
+            ImGui::Text("  Spatial Sampling Count:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderInt("##sscount", &render_settings.spacecount, 1, 20);
+            ImGui::TreePop();
+        }
+
+        if (render_settings_changed) {
+            _update_render;
+        }
 
         ImGui::Spacing();
     }

@@ -46,7 +46,6 @@ namespace VSTIR {
 
     struct CPUSwap {
 	    size_t index;
-        void* reference;
     };
 
     struct VExtensionData {
@@ -148,6 +147,13 @@ namespace VSTIR {
         alignas(4) uint32_t directlighting;
         alignas(4) uint32_t divider;
         alignas(4) uint32_t filters;
+        alignas(4) uint32_t restir;
+        alignas(4) uint32_t showdivider;
+        alignas(4) uint32_t directlightingright;
+        alignas(4) uint32_t filtersright;
+        alignas(4) uint32_t restirright;
+        alignas(4) uint32_t restirframes;
+        alignas(4) uint32_t resetreservoirs;
     };
 
     struct VulkanSwapchain {

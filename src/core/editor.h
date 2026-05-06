@@ -59,8 +59,9 @@ namespace VSTIR {
         float ViewportHeightRatio() const { return kViewportHeightRatio; }
         size_t ViewportWidth() const { return std::max<size_t>(1, (size_t)(m_Width * ViewportWidthRatio())); }
         size_t ViewportHeight() const { return std::max<size_t>(1, (size_t)(m_Height * ViewportHeightRatio())); }
-        void UpdateRender() {m_render_updated = true;}
+        void UpdateRender() {m_render_updated = true; m_reservoirs_invalidated = true;}
         bool CheckRenderUpdate() { bool r = m_render_updated; m_render_updated = false; return r; }
+        bool CheckReservoirInvalidated() { bool r = m_reservoirs_invalidated; m_reservoirs_invalidated = false; return r; }
     // private:
         size_t m_Width = 0;
         size_t m_Height = 0;
@@ -69,6 +70,7 @@ namespace VSTIR {
         InputVariables m_inputs;
 
         bool m_render_updated = false; // signals redrawing
+        bool m_reservoirs_invalidated = false;
 
         bool m_has_pending_scene_load = false;
         std::string m_pending_scene_path;

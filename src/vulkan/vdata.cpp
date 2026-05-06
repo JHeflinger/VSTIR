@@ -29,7 +29,9 @@ namespace VSTIR {
 
     void VData::RecreateSSBO() {
         VUTILS::DestroyBuffer(m_SSBO);
+        VUTILS::DestroyBuffer(m_PreviousSSBO);
         m_SSBO = {};
+        m_PreviousSSBO = {};
         InitializeSSBO();
     }
 
@@ -54,10 +56,17 @@ namespace VSTIR {
 
         VUTILS::CreateBuffer(
             bufferSize,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             &(m_SSBO));
         VUTILS::CopyBuffer(stagingBuffer.buffer, m_SSBO.buffer, bufferSize);
+
+        VUTILS::CreateBuffer(
+            bufferSize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &(m_PreviousSSBO));
+        VUTILS::CopyBuffer(stagingBuffer.buffer, m_PreviousSSBO.buffer, bufferSize);
 
         vkDestroyBuffer(_interface, stagingBuffer.buffer, nullptr);
         vkFreeMemory(_interface, stagingBuffer.memory, nullptr);
@@ -164,8 +173,10 @@ namespace VSTIR {
         ubo.width = _render_width;
         ubo.height = _render_height;
 
-        // Samples
-        if (Editor::Get()->CheckRenderUpdate() || !render_settings.accumulate_samples) render_settings.sample_count = 0;
+        // Samples control display accumulation only; ReSTIR history has its own lifetime.
+        const bool render_updated = Editor::Get()->CheckRenderUpdate();
+        const bool reservoirs_invalidated = Editor::Get()->CheckReservoirInvalidated();
+        if (render_updated || !render_settings.accumulate_samples) render_settings.sample_count = 0;
         ubo.samples = render_settings.sample_count;
         if (render_settings.accumulate_samples) render_settings.sample_count++;
 
@@ -189,6 +200,7 @@ namespace VSTIR {
         // emissives
         ubo.emissivecount = _renderer.GetGeometry().emissives.size();
         ubo.directlighting = render_settings.directlighting ? 1 : 0;
+        ubo.directlightingright = render_settings.directlighting_right ? 1 : 0;
 
         // View matrix
         static glm::mat4 vpm;
@@ -205,10 +217,28 @@ namespace VSTIR {
 
         // divider
         ubo.divider = render_settings.resolution_scale * _viewport_width / 2.0f;
+        ubo.showdivider = render_settings.show_divider ? 1 : 0;
 
         // filters
         ubo.filters = 0;
         ubo.filters |= render_settings.bilateral ? 1 : 0;
+        ubo.restir = render_settings.restir ? 1 : 0;
+        ubo.filtersright = 0;
+        ubo.filtersright |= render_settings.bilateral_right ? 1 : 0;
+        ubo.restirright = render_settings.restir_right ? 1 : 0;
+
+        const bool any_restir =
+            render_settings.show_divider ?
+            (render_settings.restir || render_settings.restir_right) :
+            render_settings.restir;
+        if (reservoirs_invalidated) {
+            render_settings.restir_history_count = 0;
+        }
+        ubo.restirframes = render_settings.restir_history_count;
+        ubo.resetreservoirs = render_settings.restir_history_count == 0 ? 1 : 0;
+        if (any_restir) {
+            render_settings.restir_history_count++;
+        }
 
         memcpy(m_UBOs.mapped, &ubo, sizeof(UniformBufferObject));
     }

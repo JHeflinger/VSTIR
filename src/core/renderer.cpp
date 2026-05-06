@@ -775,8 +775,9 @@ namespace VSTIR {
         }
         if (m_settings.denoiser)
         {
+            int levels = log2(max_w);
             shader_idxs.push_back(shader_name_idx_map["separate"]);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < levels; i++)
             {
                 shader_idxs.push_back(shader_name_idx_map["haar_horizontal"]);
                 shader_idxs.push_back(shader_name_idx_map["sync"]);
@@ -792,7 +793,7 @@ namespace VSTIR {
                     shader_idxs.push_back(shader_name_idx_map["threshold"]);
                     shader_idxs.push_back(shader_name_idx_map["sync"]);
             }
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < levels; i++)
             {
                 shader_idxs.push_back(shader_name_idx_map["inv_haar_vertical"]);
                 shader_idxs.push_back(shader_name_idx_map["sync"]);

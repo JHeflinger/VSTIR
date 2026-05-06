@@ -764,42 +764,6 @@ namespace VSTIR {
             }
         }
 
-        // Snapshot the fully updated frame reservoirs for next frame's temporal ReSTIR pass.
-        {
-            VkDeviceSize reservoirBufferSize =
-                sizeof(RayGenerator) * _renderer.GetGeometry().raygen_size;
-            if (reservoirBufferSize > 0) {
-                VkMemoryBarrier beforeCopy{};
-                beforeCopy.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-                beforeCopy.srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-                beforeCopy.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-                vkCmdPipelineBarrier(
-                    _scheduler.Commands().command,
-                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    0, 1, &beforeCopy, 0, nullptr, 0, nullptr);
-
-                VkBufferCopy copyRegion{};
-                copyRegion.size = reservoirBufferSize;
-                vkCmdCopyBuffer(
-                    _scheduler.Commands().command,
-                    _data.SSBO().buffer,
-                    _data.PreviousSSBO().buffer,
-                    1,
-                    &copyRegion);
-
-                VkMemoryBarrier afterCopy{};
-                afterCopy.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-                afterCopy.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-                afterCopy.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-                vkCmdPipelineBarrier(
-                    _scheduler.Commands().command,
-                    VK_PIPELINE_STAGE_TRANSFER_BIT,
-                    VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                    0, 1, &afterCopy, 0, nullptr, 0, nullptr);
-            }
-        }
-
         // Prepare shader output for the swapchain blit.
         {
             VkImageMemoryBarrier imgBarrier{};

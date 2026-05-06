@@ -29,9 +29,7 @@ namespace VSTIR {
 
     void VData::RecreateSSBO() {
         VUTILS::DestroyBuffer(m_SSBO);
-        VUTILS::DestroyBuffer(m_PreviousSSBO);
         m_SSBO = {};
-        m_PreviousSSBO = {};
         InitializeSSBO();
     }
 
@@ -56,17 +54,10 @@ namespace VSTIR {
 
         VUTILS::CreateBuffer(
             bufferSize,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             &(m_SSBO));
         VUTILS::CopyBuffer(stagingBuffer.buffer, m_SSBO.buffer, bufferSize);
-
-        VUTILS::CreateBuffer(
-            bufferSize,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-            &(m_PreviousSSBO));
-        VUTILS::CopyBuffer(stagingBuffer.buffer, m_PreviousSSBO.buffer, bufferSize);
 
         vkDestroyBuffer(_interface, stagingBuffer.buffer, nullptr);
         vkFreeMemory(_interface, stagingBuffer.memory, nullptr);

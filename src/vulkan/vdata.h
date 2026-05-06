@@ -15,7 +15,6 @@ namespace VSTIR {
         VulkanDescriptors* Descriptors() { return m_Descriptors; }
         UBOArray& UBOs() { return m_UBOs; }
         VulkanDataBuffer& SSBO() { return m_SSBO; }
-        VulkanDataBuffer& PreviousSSBO() { return m_PreviousSSBO; }
         void UpdateDescriptors();
         void UpdateUBOs();
     private:
@@ -26,7 +25,6 @@ namespace VSTIR {
         VulkanDescriptors* m_Descriptors;
         UBOArray m_UBOs;
         VulkanDataBuffer m_SSBO;
-        VulkanDataBuffer m_PreviousSSBO;
     };
 
 }

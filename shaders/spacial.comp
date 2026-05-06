@@ -293,10 +293,6 @@ float target_luminance(vec3 x_v, vec3 n_v, uint material_index, vec3 x_s, vec3 L
     return luminance(f);
 }
 
-float surface_distance(vec3 origin, vec3 normal, vec3 p) {
-    return abs(dot(p - origin, normal));
-}
-
 void clear_spacial(inout RayGenerator rg) {
     rg.spacial_x_v = rg.temporal_x_v;
     rg.spacial_n_v = rg.temporal_n_v;
@@ -364,9 +360,9 @@ void spacial_resample(int rx, int ry) {
         // hit check
         if (!valid_temporal_candidate(ng)) continue;
 
-        // Surface similarity. Camera-distance-normalized depth makes the reuse
-        // region grow in world space as the camera backs away.
-        if (surface_distance(rg.temporal_x_v, rg.temporal_n_v, ng.temporal_x_v) > max(ubo.depththreshold, EPS)) continue;
+        // depth similarity
+        float ndepth = length(ng.temporal_x_v - ubo.position);
+        if (abs(depth - ndepth) / depth > ubo.depththreshold) continue;
 
         // normal similarity
         if (dot(rg.temporal_n_v, ng.temporal_n_v) < ubo.normalthreshold) continue;

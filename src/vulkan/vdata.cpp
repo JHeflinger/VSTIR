@@ -2,6 +2,7 @@
 #include "vulkan/vutil.h"
 #include "core/get.h"
 #include "util/log.h"
+#include <cmath>
 #include <cstring>
 #include <random>
 #include <glm/gtc/matrix_transform.hpp>
@@ -29,7 +30,9 @@ namespace VSTIR {
 
     void VData::RecreateSSBO() {
         VUTILS::DestroyBuffer(m_SSBO);
+        VUTILS::DestroyBuffer(m_PreviousSSBO);
         m_SSBO = {};
+        m_PreviousSSBO = {};
         InitializeSSBO();
     }
 
@@ -57,7 +60,13 @@ namespace VSTIR {
             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
             &(m_SSBO));
+        VUTILS::CreateBuffer(
+            bufferSize,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+            &(m_PreviousSSBO));
         VUTILS::CopyBuffer(stagingBuffer.buffer, m_SSBO.buffer, bufferSize);
+        VUTILS::CopyBuffer(stagingBuffer.buffer, m_PreviousSSBO.buffer, bufferSize);
 
         vkDestroyBuffer(_interface, stagingBuffer.buffer, nullptr);
         vkFreeMemory(_interface, stagingBuffer.memory, nullptr);
@@ -194,17 +203,20 @@ namespace VSTIR {
         ubo.directlightingright = render_settings.directlighting_right ? 1 : 0;
 
         // View matrix
-        static glm::mat4 vpm;
+        static glm::mat4 previous_vpm;
         static bool first_vpm = true;
-        ubo.previousvpm = vpm;
         glm::mat4 view = glm::lookAt(ubo.position, ubo.position + ubo.look, ubo.up);
-        glm::mat4 proj = glm::perspective(ubo.fov, (float)ubo.width / (float)ubo.height, 0.1f, 1000.0f);
+        const float aspect = (float)ubo.width / (float)ubo.height;
+        const float vertical_fov = 2.0f * std::atan(std::tan(ubo.fov * 0.5f) / aspect);
+        glm::mat4 proj = glm::perspective(vertical_fov, aspect, 0.1f, 1000.0f);
         proj[1][1] *= -1;
-        vpm = proj * view;
-        if (first_vpm) {
+        ubo.currentvpm = proj * view;
+        ubo.previousvpm = previous_vpm;
+        if (first_vpm || reservoirs_invalidated) {
             first_vpm = false;
-            ubo.previousvpm = vpm;
+            ubo.previousvpm = ubo.currentvpm;
         }
+        previous_vpm = ubo.currentvpm;
 
         // divider
         ubo.divider = render_settings.resolution_scale * _viewport_width / 2.0f;
@@ -222,7 +234,7 @@ namespace VSTIR {
             render_settings.show_divider ?
             (render_settings.restir || render_settings.restir_right) :
             render_settings.restir;
-        if (reservoirs_invalidated) {
+        if (reservoirs_invalidated || !any_restir) {
             render_settings.restir_history_count = 0;
         }
         ubo.restirframes = render_settings.restir_history_count;

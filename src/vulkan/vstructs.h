@@ -39,6 +39,9 @@ namespace VSTIR {
         alignas(4) uint32_t spatial_flags;
         alignas(16) glm::vec3 direct;
         alignas(16) glm::vec3 filtered;
+        alignas(16) glm::vec3 filtered_tmp;
+        alignas(16) glm::vec3 direct_filtered;
+        alignas(16) glm::vec3 direct_filtered_tmp;
     };
 
     typedef enum {
@@ -143,10 +146,11 @@ namespace VSTIR {
         alignas(16) glm::mat4 currentvpm;
         alignas(4) float depththreshold;
         alignas(4) float normalthreshold;
-        alignas(4) uint32_t contributioncap;
-        alignas(4) uint32_t candidatecap;
+        alignas(4) uint32_t temporal_m_cap;
+        alignas(4) uint32_t spatial_m_cap;
         alignas(4) uint32_t spacerange;
         alignas(4) uint32_t spacecount;
+        alignas(4) uint32_t restir_bounces;
         alignas(4) uint32_t emissivecount;
         alignas(4) uint32_t directlighting;
         alignas(4) uint32_t divider;

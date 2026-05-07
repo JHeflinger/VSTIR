@@ -183,10 +183,11 @@ namespace VSTIR {
         // restir settings
         ubo.depththreshold = render_settings.depththreshold;
         ubo.normalthreshold = render_settings.normalthreshold;
-        ubo.contributioncap = (uint32_t)render_settings.contributioncap;
-        ubo.candidatecap = (uint32_t)render_settings.candidatecap;
+        ubo.temporal_m_cap = (uint32_t)render_settings.temporal_m_cap;
+        ubo.spatial_m_cap = (uint32_t)render_settings.spatial_m_cap;
         ubo.spacerange = (uint32_t)render_settings.spacerange;
         ubo.spacecount = (uint32_t)render_settings.spacecount;
+        ubo.restir_bounces = (uint32_t)render_settings.restir_bounces;
 
         // Camera
         ubo.fov = glm::radians(_renderer.GetCamera().Fov());

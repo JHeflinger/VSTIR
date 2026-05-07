@@ -6,14 +6,14 @@ denoiser bias
 ```
 where bias is any float number. Below is some sample images with different bias values
 
-| original | 0.0 | 0.02 | 0.07|
+| original | 0.0 | 0.02 | 0.05|
 | --- | --- | --- | --- |
-| ![original](./data/noise1.png) | ![no bias](./denoised_data/bias0_noise1.png) | ![bias=0.02](./denoised_data/bias0.02_noise1.png) | ![bias=0.07](./denoised_data/bias0.07_noise1.png)|
-| ![original](./data/noise2.png) | ![no bias](./denoised_data/bias0_noise2.png) | ![bias=0.02](./denoised_data/bias0.02_noise2.png) | ![bias=0.07](./denoised_data/bias0.07_noise2.png)|
-| ![original](./data/noise3.png) | ![no bias](./denoised_data/bias0_noise3.png) | ![bias=0.02](./denoised_data/bias0.02_noise3.png) | ![bias=0.07](./denoised_data/bias0.07_noise3.png)|
-| ![original](./data/cute_cat.jpg) | ![no bias](./denoised_data/bias0_cute_cat.jpg) | ![bias=0.02](./denoised_data/bias0.02_cute_cat.jpg) | ![bias=0.07](./denoised_data/bias0.07_cute_cat.jpg)|
-| ![original](./data/cool1.jpg) | ![no bias](./denoised_data/bias0_cool1.jpg) | ![bias=0.02](./denoised_data/bias0.02_cool1.jpg) | ![bias=0.07](./denoised_data/bias0.07_cool1.jpg)|
-| ![original](./data/cool2.jpg) | ![no bias](./denoised_data/bias0_cool2.jpg) | ![bias=0.02](./denoised_data/bias0.02_cool2.jpg) | ![bias=0.07](./denoised_data/bias0.07_cool2.jpg)|
+| ![original](./data/noise1.png) | ![no bias](./denoised_data/bias0_noise1.png) | ![bias=0.02](./denoised_data/bias0.02_noise1.png) | ![bias=0.05](./denoised_data/bias0.05_noise1.png)|
+| ![original](./data/noise2.png) | ![no bias](./denoised_data/bias0_noise2.png) | ![bias=0.02](./denoised_data/bias0.02_noise2.png) | ![bias=0.05](./denoised_data/bias0.05_noise2.png)|
+| ![original](./data/noise3.png) | ![no bias](./denoised_data/bias0_noise3.png) | ![bias=0.02](./denoised_data/bias0.02_noise3.png) | ![bias=0.05](./denoised_data/bias0.05_noise3.png)|
+| ![original](./data/cute_cat.jpg) | ![no bias](./denoised_data/bias0_cute_cat.jpg) | ![bias=0.02](./denoised_data/bias0.02_cute_cat.jpg) | ![bias=0.05](./denoised_data/bias0.05_cute_cat.jpg)|
+| ![original](./data/cool1.jpg) | ![no bias](./denoised_data/bias0_cool1.jpg) | ![bias=0.02](./denoised_data/bias0.02_cool1.jpg) | ![bias=0.05](./denoised_data/bias0.05_cool1.jpg)|
+| ![original](./data/cool2.jpg) | ![no bias](./denoised_data/bias0_cool2.jpg) | ![bias=0.02](./denoised_data/bias0.02_cool2.jpg) | ![bias=0.05](./denoised_data/bias0.05_cool2.jpg)|
 
 ## Cornell Samples
 | original | 0.0 | 0.02 |

@@ -239,9 +239,17 @@ void soft_thresh_img(std::vector<float>& data, int width, int height, int gw, in
         }
     }
 }
+float sgn(float v)
+{
+    return (v>0) - (v<0);
+}
 float soft_thresh(float v, float t)
 {
-    float k =  ((v > 0) - (v < 0)) * std::max(((float)fabs(v) - t), 0.0f);
+    float a = 3.7;
+    float k =  
+        sgn(v) * std::max(((float)fabs(v) - t), 0.0f) * (fabs(v) <= 2 * t)
+        + ((a-1) * v - a * t * sgn(v))/ (a-2) * (fabs(v) > 2 * t && fabs(v) < a * t)
+        + v * (fabs(v) > a * t);
     return k;
 }
 

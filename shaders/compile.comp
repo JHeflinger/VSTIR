@@ -2,7 +2,6 @@
 #extension GL_GOOGLE_include_directive : enable
 #include "common.glsl"
 
-#define MAX_RECURSIVE_DEPTH 2000
 #define EPS 0.000001
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
@@ -33,6 +32,8 @@ layout(binding = 7, rgba8) uniform image2D restirImage;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+#include "bvh.glsl"
+
 const float PI = 3.14159265358979323846;
 
 bool finite_vec3(vec3 v) {
@@ -55,80 +56,6 @@ vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
     return position + normal * (dot(normal, direction) >= 0.0 ? EPS : -EPS);
 }
 
-bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
-    Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vertexIn[tri.a];
-    vec3 _b = vertexIn[tri.b];
-    vec3 _c = vertexIn[tri.c];
-    vec3 e1 = _b - _a;
-    vec3 e2 = _c - _a;
-    vec3 h = cross(ray.direction, e2);
-    float a = dot(e1, h);
-    if (abs(a) < EPS) return false;
-    float f = 1.0 / a;
-    vec3 s = ray.position - _a;
-    float u = f*dot(s, h);
-    if (u < 0.0 || u > 1.0) return false;
-    vec3 q = cross(s, e1);
-    float v = f*dot(ray.direction, q);
-    if (v < 0.0 || u + v > 1.0) return false;
-    hit.distance = f * dot(e2, q);
-    if (hit.distance <= EPS) return false;
-    hit.material = tri.material;
-    hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
-    else hit.normal = normalize(cross(e1, e2));
-    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
-    return true;
-}
-
-bool aabb_intersect(Ray ray, uint node_ind) {
-	vec3 dfrac = 1.0 / ray.direction;
-    vec3 mindif = (bvhIn[node_ind].min - ray.position)*dfrac;
-    vec3 maxdif = (bvhIn[node_ind].max - ray.position)*dfrac;
-	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
-	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
-    return tmax >= 0 && tmin <= tmax;
-}
-
-Hit trace(Ray ray, inout uint hit_id) {
-    Hit hit;
-    hit.distance = -1.0;
-    hit.material = 0;
-    hit.normal = vec3(0.0);
-    hit.position = vec3(0.0);
-    if (ubo.triangles == 0) return hit;
-    if (!aabb_intersect(ray, 0)) return hit;
-    uint stack[MAX_RECURSIVE_DEPTH];
-    int stack_ptr = 0;
-    stack[stack_ptr++] = 0;
-    while (stack_ptr > 0) {
-        NodeBVH node = bvhIn[stack[--stack_ptr]];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { break; }
-        if (node.config == 0) {
-            Hit trihit;
-            if (triangle_intersect(ray, node.left, trihit)) {
-                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
-                    hit = trihit;
-					hit_id = node.left;
-                }
-            }
-        } else if (node.config == 1) {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-        } else if (node.config == 2) {
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        } else {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        }
-    }
-    return hit;
-}
-
 vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
     return ((material.diffuse / PI) +
         (material.specular * (material.shiny + 2.0) /
@@ -142,9 +69,7 @@ bool visible_reconnection(vec3 x_v, vec3 n_v, vec3 x_s) {
     if (sample_dist <= EPS) return false;
     vec3 direction = delta / sample_dist;
     Ray ray = { offset_ray_origin(x_v, n_v, direction), direction };
-    uint hit_id = -1;
-    Hit hit = trace(ray, hit_id);
-    return hit.distance <= 0.0 || hit.distance >= sample_dist - EPS;
+    return !traceAny(ray, sample_dist - EPS);
 }
 
 vec3 compile_reservoir() {

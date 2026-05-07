@@ -23,7 +23,7 @@ where bias is any float number. Below is some sample images with different bias 
 
 | original | 0.05 | 0.07|
 | --- | --- | --- |
-| ![original](./data/cornell_nee_norestir.png) | ![no bias](./denoised_data/bias0.05_cornell_nee_norestir.png) | ![bias=0.02](./denoised_data/bias0.02_cornell_nee_norestir.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nee_norestir.png)|
-| ![original](./data/cornell_nonee_restir.png) | ![no bias](./denoised_data/bias0.05_cornell_nonee_restir.png) | ![bias=0.02](./denoised_data/bias0.02_cornell_nonee_restir.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nonee_restir.png)|
-| ![original](./data/cornell_nee_restir1.png) | ![no bias](./denoised_data/bias0.05_cornell_nee_restir1.png) | ![bias=0.02](./denoised_data/bias0.02_cornell_nee_restir1.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nee_restir1.png)|
-| ![original](./data/cornell_nee_restir2.png) | ![no bias](./denoised_data/bias0.05_cornell_nee_restir2.png) | ![bias=0.02](./denoised_data/bias0.02_cornell_nee_restir2.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nee_restir2.png)|
+| ![original](./data/cornell_nee_norestir.png) | ![bias=0.05](./denoised_data/bias0.05_cornell_nee_norestir.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nee_norestir.png)|
+| ![original](./data/cornell_nonee_restir.png) | ![bias=0.05](./denoised_data/bias0.05_cornell_nonee_restir.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nonee_restir.png)|
+| ![original](./data/cornell_nee_restir1.png) | ![bias=0.05](./denoised_data/bias0.05_cornell_nee_restir1.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nee_restir1.png)|
+| ![original](./data/cornell_nee_restir2.png) | ![bias=0.05](./denoised_data/bias0.05_cornell_nee_restir2.png) | ![bias=0.07](./denoised_data/bias0.07_cornell_nee_restir2.png)|

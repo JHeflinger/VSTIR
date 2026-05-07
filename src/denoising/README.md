@@ -56,3 +56,10 @@ operates on subdivisions on image then combines. Below is subdivision twice.
 | ![original](./data/cornell_nonee_restir.png) | ![no bias_divisions2](./denoised_subdivide_data/bias0_divisions2_cornell_nonee_restir.png) | ![bias_divisions2=0.02](./denoised_subdivide_data/bias0.02_divisions2_cornell_nonee_restir.png) 
 | ![original](./data/cornell_nee_restir1.png) | ![no bias_divisions2](./denoised_subdivide_data/bias0_divisions2_cornell_nee_restir1.png) | ![bias_divisions2=0.02](./denoised_subdivide_data/bias0.02_divisions2_cornell_nee_restir1.png) 
 | ![original](./data/cornell_nee_restir2.png) | ![no bias_divisions2](./denoised_subdivide_data/bias0_divisions2_cornell_nee_restir2.png) | ![bias_divisions2=0.02](./denoised_subdivide_data/bias0.02_divisions2_cornell_nee_restir2.png) 
+
+| original | 0.05 | 0.07 |
+| --- | --- | ---|
+| ![original](./data/cornell_nee_norestir.png) | ![no bias_divisions2](./denoised_subdivide_data/bias0.05_divisions2_cornell_nee_norestir.png) | ![bias_divisions2=0.07](./denoised_subdivide_data/bias0.07_divisions2_cornell_nee_norestir.png) 
+| ![original](./data/cornell_nonee_restir.png) | ![no bias_divisions2](./denoised_subdivide_data/bias0.05_divisions2_cornell_nonee_restir.png) | ![bias_divisions2=0.07](./denoised_subdivide_data/bias0.07_divisions2_cornell_nonee_restir.png) 
+| ![original](./data/cornell_nee_restir1.png) | ![no bias_divisions2](./denoised_subdivide_data/bias0.05_divisions2_cornell_nee_restir1.png) | ![bias_divisions2=0.07](./denoised_subdivide_data/bias0.07_divisions2_cornell_nee_restir1.png) 
+| ![original](./data/cornell_nee_restir2.png) | ![no bias_divisions2](./denoised_subdivide_data/bias0.05_divisions2_cornell_nee_restir2.png) | ![bias_divisions2=0.07](./denoised_subdivide_data/bias0.07_divisions2_cornell_nee_restir2.png) 

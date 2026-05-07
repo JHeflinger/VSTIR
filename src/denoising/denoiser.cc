@@ -3,6 +3,70 @@
 #include <cmath>
 #include <iostream>
 #include "denoiser.h"
+#define DEN (1)
+void denoise_divide(std::vector<col3f>& img, int stride, float bias, int divisions, bool global)
+{
+    int height = img.size() / stride;
+    int max_w = std::max(stride, (int)img.size() / stride);
+    max_w = std::pow(2, std::ceil(log2(max_w)));
+    int max_h = max_w;
+    std::vector<std::vector<col3f>> imgs;
+    int new_width = std::max(max_w >> divisions, 16);
+    int new_height = new_width;
+    int sz = (max_w / new_width);
+    imgs.resize(sz * sz);
+    for (int k = 0; k < sz*sz; k++)
+    {
+        imgs[k].resize(new_width * new_height);
+    }
+    for (int k1 = 0; k1 < sz; k1++)
+    {
+        for (int k2 = 0; k2 < sz; k2++)
+        {
+            int k = k1 * sz + k2;
+            for (int j = 0; j < new_height; j++)
+            {
+                for (int i = 0; i < new_width; i++)
+                {
+                    int y = (j + new_height * k1);
+                    int x = (i + new_width * k2);
+                    if (y < height && x < stride)
+                    {
+                        imgs[k][j * new_width  + i] = 
+                            img[y * stride + x];
+                    }
+                    else 
+                    {
+                        imgs[k][j * new_width  + i] = {0, 0, 0};
+                    }
+                }
+            }
+        }
+    }
+    for (int k = 0; k < sz*sz; k++)
+    {
+        denoise(imgs[k], new_width, bias, global);
+    }
+
+    for (int k1 = 0; k1 < sz; k1++)
+    {
+        for (int k2 = 0; k2 < sz; k2++)
+        {
+            int k = k1 * sz + k2;
+        for (int j = 0; j < new_height; j++)
+        {
+            int y = (j + new_height * k1);
+            if (y >= height) break;
+            for (int i = 0; i < new_width; i++)
+            {
+                int x = (i + new_width * k2);
+                if (x >= stride) break;
+                img[y * stride + x] = imgs[k][j * new_width  + i];
+            }
+        }
+    }
+    }
+}
 void denoise_space_transform(std::vector<col3f>& img, int stride, float bias, bool global)
 {
     int max_w = std::max(stride, (int)img.size() / stride);
@@ -60,6 +124,13 @@ void denoise_space_transform(std::vector<col3f>& img, int stride, float bias, bo
 }
 void denoise(std::vector<col3f>& img, int stride, float bias, bool global)
 {
+#if !DEN
+    for (int i = 0; i < img.size(); i++)
+    {
+        img[i] = {1., 0., 0.};
+    }
+#endif
+#if DEN
     int max_w = std::max(stride, (int)img.size() / stride);
     max_w = std::pow(2, std::ceil(log2(max_w)));
     int max_h = max_w;
@@ -113,6 +184,7 @@ void denoise(std::vector<col3f>& img, int stride, float bias, bool global)
         inv_wavelet_transform_2d(imgb, currw, currh, max_w);
     }
     combine_components(img, stride, max_w, imgr, imgg, imgb);
+#endif
 }
 
 

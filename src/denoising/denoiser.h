@@ -9,6 +9,7 @@ struct col3f
     inline float operator()(int idx) {return comps[idx];}
     inline void set(float r, float g, float b) {comps[0] = r; comps[1] = g; comps[2] = b;}
 };
+void denoise_divide(std::vector<col3f>& img, int stride, float bias, int divisions = 0, bool global = false);
 // uses haar with multilevels.
 void wavelet_transform_1d(float*, int);
 void inv_wavelet_transform_1d(float*, int);

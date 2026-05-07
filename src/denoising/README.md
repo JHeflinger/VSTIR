@@ -16,6 +16,7 @@ where bias is any float number. Below is some sample images with different bias 
 | ![original](./data/cool2.jpg) | ![no bias](./denoised_data/bias0_cool2.jpg) | ![bias=0.02](./denoised_data/bias0.02_cool2.jpg) | ![bias=0.05](./denoised_data/bias0.05_cool2.jpg)|
 
 ## Cornell Samples
+(main failure on second image)
 | original | 0.0 | 0.02 |
 | --- | --- | ---|
 | ![original](./data/cornell_nee_norestir.png) | ![no bias](./denoised_data/bias0_cornell_nee_norestir.png) | ![bias=0.02](./denoised_data/bias0.02_cornell_nee_norestir.png) 

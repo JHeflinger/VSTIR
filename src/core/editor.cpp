@@ -166,6 +166,7 @@ namespace VSTIR {
 
         if (winW > 0 && winH > 0) {
             editor->m_render_updated = true;
+            editor->m_reservoirs_invalidated = true;
             Get()->m_Width = winW;
             Get()->m_Height = winH;
             Get()->m_Renderer.Resize((uint32_t)width, (uint32_t)height);
@@ -180,6 +181,7 @@ namespace VSTIR {
             m_has_pending_scene_load = false;
             m_Renderer.LoadScene(scenePath);
             m_render_updated = true;
+            m_reservoirs_invalidated = true;
         }
 
         UpdateCameraPosition(delta_time);

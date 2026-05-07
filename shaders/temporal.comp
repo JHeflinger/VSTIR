@@ -1,105 +1,8 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
+#include "common.glsl"
 
-#define MAX_RECURSIVE_DEPTH 2000
 #define EPS 0.000001
-
-struct Triangle {
-    uint a;
-    uint b;
-    uint c;
-    uint an;
-    uint bn;
-    uint cn;
-    uint material;
-};
-
-struct NodeBVH {
-    vec3 min;
-    vec3 max;
-    uint config;
-    uint left;
-    uint right;
-};
-
-struct Ray {
-    vec3 position;
-    vec3 direction;
-};
-
-struct Hit {
-    float distance;
-    uint material;
-    vec3 normal;
-    vec3 position;
-};
-
-struct Material {
-    vec3 emission;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    vec3 absorbtion;
-    vec3 dispersion;
-    float ior;
-    float shiny;
-    uint model;
-};
-
-struct RayGenerator {
-    vec3 rawaccumulation;
-    vec3 accumulation;
-    vec3 initial_x_v;
-    vec3 initial_n_v;
-    vec3 initial_x_s;
-    vec3 initial_n_s;
-    vec3 initial_Lo;
-    float initial_pdf;
-    uint initial_mat;
-    vec3 temporal_x_v;
-    vec3 temporal_n_v;
-    vec3 temporal_x_s;
-    vec3 temporal_n_s;
-    vec3 temporal_Lo;
-    float temporal_w;
-    uint temporal_M;
-    float temporal_W;
-    vec3 spacial_x_v;
-    vec3 spacial_n_v;
-    vec3 spacial_x_s;
-    vec3 spacial_n_s;
-    vec3 spacial_Lo;
-    float spacial_w;
-    uint spacial_M;
-    float spacial_W;
-    vec3 direct;
-    vec3 filtered;
-};
-
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    uint triangles;
-    uint seed;
-    uint samples;
-    float fov;
-    float width;
-    float height;
-    mat4 previousvpm;
-    float depththreshold;
-    float normalthreshold;
-    uint contributioncap;
-    uint candidatecap;
-    uint spacerange;
-    uint spacecount;
-    uint emissivecount;
-    uint directlighting;
-    uint divider;
-    uint filters;
-} ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
@@ -125,9 +28,14 @@ layout(binding = 6) readonly buffer MaterialsSSBOIn {
     Material materialIn[ ];
 };
 
+layout(binding = 7) readonly buffer PreviousRayGeneratorSSBOIn {
+   RayGenerator previousRaygenIn[ ];
+};
+
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-const float max_contribution = 10;
+#include "bvh.glsl"
+
 const float PI = 3.14159265358979323846;
 uvec4 seed = uvec4(0);
 
@@ -167,77 +75,6 @@ Ray create_ray(vec2 rg) {
     return ray;
 }
 
-bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
-    Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vertexIn[tri.a];
-    vec3 _b = vertexIn[tri.b];
-    vec3 _c = vertexIn[tri.c];
-    vec3 e1 = _b - _a;
-    vec3 e2 = _c - _a;
-    vec3 h = cross(ray.direction, e2);
-    float a = dot(e1, h);
-    if (abs(a) < EPS) return false;
-    float f = 1.0 / a;
-    vec3 s = ray.position - _a;
-    float u = f*dot(s, h);
-    if (u < 0.0 || u > 1.0) return false;
-    vec3 q = cross(s, e1);
-    float v = f*dot(ray.direction, q);
-    if (v < 0.0 || u + v > 1.0) return false;
-    hit.distance = f * dot(e2, q);
-    if (hit.distance <= EPS) return false;
-    hit.material = tri.material;
-    hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
-    else hit.normal = normalize(cross(e1, e2));
-    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
-    return true;
-}
-
-bool aabb_intersect(Ray ray, uint node_ind) {
-	vec3 dfrac = 1.0 / ray.direction;
-    vec3 mindif = (bvhIn[node_ind].min - ray.position)*dfrac;
-    vec3 maxdif = (bvhIn[node_ind].max - ray.position)*dfrac;
-	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
-	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
-    return tmax >= 0 && tmin <= tmax;
-}
-
-Hit trace(Ray ray, inout uint hit_id) {
-    Hit hit;
-    hit.distance = -1.0;
-    if (ubo.triangles == 0) return hit;
-    if (!aabb_intersect(ray, 0)) return hit;
-    uint stack[MAX_RECURSIVE_DEPTH];
-    int stack_ptr = 0;
-    stack[stack_ptr++] = 0;
-    while (stack_ptr > 0) {
-        NodeBVH node = bvhIn[stack[--stack_ptr]];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { break; }
-        if (node.config == 0) {
-            Hit trihit;
-            if (triangle_intersect(ray, node.left, trihit)) {
-                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
-                    hit = trihit;
-					hit_id = node.left;
-                }
-            }
-        } else if (node.config == 1) {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-        } else if (node.config == 2) {
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        } else {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        }
-    }
-    return hit;
-}
-
 vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
     return ((material.diffuse / PI) +
         (material.specular * (material.shiny + 2.0) /
@@ -249,6 +86,18 @@ float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
 
+bool finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+bool right_side() {
+    return ubo.showdivider != 0 && int(gl_GlobalInvocationID.x % uint(ubo.width)) > int(ubo.divider);
+}
+
+bool restir_enabled() {
+    return (right_side() ? ubo.restirright : ubo.restir) != 0;
+}
+
 float diffuse_pdf(vec3 normal, vec3 incoming) {
     return max(0.0, dot(normal, incoming)) / PI;
 }
@@ -258,34 +107,193 @@ float specular_pdf(vec3 incoming, vec3 R, float shiny) {
     return (shiny + 1.0) * pow(cosalpha, shiny) / (2.0 * PI);
 }
 
-float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal) { //TODO: this does not consider specular lobe, fix later
-    return diffuse_pdf(normal, incoming);
+float target_luminance_at_visible(vec3 x_v, vec3 n_v, uint material_index, vec3 x_s, vec3 Lo) {
+    if (length(x_s - x_v) <= EPS) return 0.0;
+    return restir_contribution_target_luminance(x_v, n_v, x_s, Lo, materialIn[material_index]);
+}
+
+void clear_temporal(inout RayGenerator rg) {
+    rg.temporal_x_v = vec3(0.0);
+    rg.temporal_n_v = vec3(0.0);
+    rg.temporal_x_s = vec3(0.0);
+    rg.temporal_n_s = vec3(0.0);
+    rg.temporal_Lo = vec3(0.0);
+    rg.temporal_w = 0.0;
+    rg.temporal_M = 0;
+    rg.temporal_W = 0.0;
+    rg.temporal_flags = 0;
+}
+
+bool exportable_flags(uint flags) {
+    uint required = RESTIR_FLAG_EXPORTABLE | RESTIR_FLAG_DIFFUSE_REUSE;
+    return (flags & required) == required;
+}
+
+bool valid_temporal_history(RayGenerator rg) {
+    return rg.temporal_M > 0 &&
+        rg.temporal_W > 0.0 &&
+        exportable_flags(rg.temporal_flags) &&
+        restir_valid_radiance(rg.temporal_Lo) &&
+        length(rg.temporal_n_v) > EPS &&
+        length(rg.temporal_n_s) > EPS &&
+        length(rg.temporal_x_s - rg.temporal_x_v) > EPS;
+}
+
+bool reproject_pixel(vec3 world_position, out uint pixel_index) {
+    vec4 clip = ubo.previousvpm * vec4(world_position, 1.0);
+    if (clip.w <= EPS) return false;
+    vec3 ndc = clip.xyz / clip.w;
+    if (ndc.x < -1.0 || ndc.x > 1.0 || ndc.y < -1.0 || ndc.y > 1.0 || ndc.z < -1.0 || ndc.z > 1.0) {
+        return false;
+    }
+    ivec2 pixel = ivec2((ndc.xy * 0.5 + 0.5) * vec2(ubo.width, ubo.height));
+    if (pixel.x < 0 || pixel.x >= int(ubo.width) || pixel.y < 0 || pixel.y >= int(ubo.height)) return false;
+    pixel_index = uint(pixel.y) * uint(ubo.width) + uint(pixel.x);
+    return true;
+}
+
+float reprojection_world_tolerance(float current_depth) {
+    float pixel_footprint = 2.0 * current_depth * tan(ubo.fov * 0.5) / max(ubo.width, 1.0);
+    return max(4.0 * pixel_footprint, 1e-4);
+}
+
+vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
+    return position + normal * (dot(normal, direction) >= 0.0 ? EPS : -EPS);
+}
+
+bool visible_reconnection(vec3 x_v, vec3 n_v, vec3 x_s) {
+    vec3 delta = x_s - x_v;
+    float sample_dist = length(delta);
+    if (sample_dist <= EPS) return false;
+    vec3 direction = delta / sample_dist;
+    Ray ray = { restir_offset_ray_origin(x_v, n_v, direction), direction };
+    return !traceAny(ray, sample_dist - EPS);
+}
+
+bool valid_gi_sample_for_surface(vec3 x_v, vec3 n_v, uint material_index, vec3 x_s, vec3 n_s, vec3 Lo) {
+    if (!finite_vec3(x_s) || !finite_vec3(n_s) || length(n_s) <= EPS) return false;
+    if (target_luminance_at_visible(x_v, n_v, material_index, x_s, Lo) <= EPS) return false;
+    return visible_reconnection(x_v, n_v, x_s);
+}
+
+bool compatible_reprojected_history(RayGenerator current, RayGenerator history) {
+    if (ubo.resetreservoirs != 0 || ubo.restirframes == 0) return false;
+    if (!valid_temporal_history(history)) return false;
+    if (current.initial_mat != history.initial_mat) return false;
+    if (dot(current.initial_n_v, history.temporal_n_v) < ubo.normalthreshold) return false;
+    float current_depth = length(current.initial_x_v - ubo.position);
+    if (current_depth <= EPS) return false;
+    float world_delta = length(current.initial_x_v - history.temporal_x_v);
+    if (world_delta > reprojection_world_tolerance(current_depth)) return false;
+    return true;
+}
+
+void merge_temporal_candidate(
+    inout RayGenerator rg,
+    vec3 target_x_v,
+    vec3 target_n_v,
+    vec3 candidate_x_s,
+    vec3 candidate_n_s,
+    vec3 candidate_Lo,
+    float candidate_weight,
+    uint candidate_M,
+    uint candidate_flags) {
+    if (candidate_weight <= EPS || candidate_M == 0u || isnan(candidate_weight) || isinf(candidate_weight)) return;
+    uint original_M = candidate_M;
+    candidate_M = min(candidate_M, max(ubo.temporal_m_cap, 1u));
+    candidate_weight *= float(candidate_M) / float(original_M);
+    rg.temporal_w += candidate_weight;
+    rg.temporal_M += candidate_M;
+    if (random() < candidate_weight / rg.temporal_w) {
+        rg.temporal_x_v = target_x_v;
+        rg.temporal_n_v = target_n_v;
+        rg.temporal_x_s = candidate_x_s;
+        rg.temporal_n_s = candidate_n_s;
+        rg.temporal_Lo = candidate_Lo;
+        rg.temporal_flags = candidate_flags;
+    }
 }
 
 void temporal_resample() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
-    float phat = luminance(rg.initial_Lo);
-    if (rg.initial_pdf == 0) return;
-    float w = phat / rg.initial_pdf;
-    rg.temporal_w += w;
-    rg.temporal_M += 1;
-    if (random() < w / rg.temporal_w) {
-        rg.temporal_x_v = rg.initial_x_v;
-        rg.temporal_n_v = rg.initial_n_v;
-        rg.temporal_x_s = rg.initial_x_s;
-        rg.temporal_n_s = rg.initial_n_s;
-        rg.temporal_Lo = rg.initial_Lo;
+    clear_temporal(rg);
+    if (ubo.resetreservoirs != 0 || length(rg.initial_n_v) <= EPS) {
+        raygenIn[gl_GlobalInvocationID.x] = rg;
+        return;
     }
-    float phat_z = luminance(rg.temporal_Lo);
-    rg.temporal_W = rg.temporal_w / (float(rg.temporal_M) * phat_z);
+
+    float initial_phat = target_luminance_at_visible(rg.initial_x_v, rg.initial_n_v, rg.initial_mat, rg.initial_x_s, rg.initial_Lo);
+    if (rg.initial_pdf > EPS && initial_phat > EPS && finite_vec3(rg.initial_Lo)) {
+        merge_temporal_candidate(
+            rg,
+            rg.initial_x_v,
+            rg.initial_n_v,
+            rg.initial_x_s,
+            rg.initial_n_s,
+            rg.initial_Lo,
+            initial_phat / rg.initial_pdf,
+            1u,
+            rg.initial_flags);
+    }
+
+    uint history_index = 0u;
+    if (reproject_pixel(rg.initial_x_v, history_index)) {
+        RayGenerator history = previousRaygenIn[history_index];
+        if (compatible_reprojected_history(rg, history) &&
+            valid_gi_sample_for_surface(
+                rg.initial_x_v,
+                rg.initial_n_v,
+                rg.initial_mat,
+                history.temporal_x_s,
+                history.temporal_n_s,
+                history.temporal_Lo)) {
+            float phat = target_luminance_at_visible(
+                rg.initial_x_v,
+                rg.initial_n_v,
+                rg.initial_mat,
+                history.temporal_x_s,
+                history.temporal_Lo);
+            float jacobian_correction = restir_reconnection_correction(
+                history.temporal_x_v,
+                rg.initial_x_v,
+                history.temporal_x_s,
+                history.temporal_n_s);
+            if (phat > EPS && jacobian_correction > EPS) {
+                merge_temporal_candidate(
+                    rg,
+                    rg.initial_x_v,
+                    rg.initial_n_v,
+                    history.temporal_x_s,
+                    history.temporal_n_s,
+                    history.temporal_Lo,
+                    (phat * jacobian_correction) * history.temporal_W * float(history.temporal_M),
+                    history.temporal_M,
+                    history.temporal_flags);
+            }
+        }
+    }
+
+    if (rg.temporal_M > ubo.temporal_m_cap) {
+        float oldM = float(rg.temporal_M);
+        rg.temporal_M = max(ubo.temporal_m_cap, 1u);
+        rg.temporal_w *= float(rg.temporal_M) / oldM;
+    }
+    float phat_z = target_luminance_at_visible(rg.initial_x_v, rg.initial_n_v, rg.initial_mat, rg.temporal_x_s, rg.temporal_Lo);
+    if (rg.temporal_M == 0 || phat_z <= EPS || rg.temporal_w <= EPS || !finite_vec3(rg.temporal_Lo)) {
+        rg.temporal_W = 0.0;
+        rg.temporal_flags = 0u;
+    } else {
+        rg.temporal_W = rg.temporal_w / (float(rg.temporal_M) * phat_z);
+    }
     raygenIn[gl_GlobalInvocationID.x] = rg;
 }
 
 void main() {
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
-	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
+    if (!restir_enabled()) return;
     temporal_resample();
 }

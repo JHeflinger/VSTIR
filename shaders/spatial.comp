@@ -1,0 +1,343 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+#include "common.glsl"
+
+#define EPS 0.000001
+
+layout(binding = 1) readonly buffer TriangleSSBOIn {
+    Triangle triangleIn[ ];
+};
+
+layout(binding = 2) buffer BVHNodeSSBOIn {
+    NodeBVH bvhIn[ ];
+};
+
+layout(binding = 3) readonly buffer NormalsSSBOIn {
+    vec3 normalIn[ ];
+};
+
+layout(binding = 4) readonly buffer VertexSSBOIn {
+    vec3 vertexIn[ ];
+};
+
+layout(binding = 5) buffer RayGeneratorSSBOIn {
+   RayGenerator raygenIn[ ];
+};
+
+layout(binding = 6) readonly buffer MaterialsSSBOIn {
+    Material materialIn[ ];
+};
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+#include "bvh.glsl"
+
+const int MAX_SPATIAL_CANDIDATES = 32;
+const bool ENABLE_BOILING_FILTER = true;
+const float BOILING_FILTER_STRENGTH = 8.0;
+const float PI = 3.14159265358979323846;
+uvec4 seed = uvec4(0);
+
+void init_random(int x, int y) {
+    seed = uvec4(x, y, ubo.seed, x + y);
+}
+
+void pcg4d(inout uvec4 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.w;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v.w += v.y * v.z;
+    v = v ^ (v >> 16u);
+    v.x += v.y * v.w;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v.w += v.y * v.z;
+}
+
+float random() {
+    pcg4d(seed);
+    return float(seed.x) / float(0xffffffffu);
+}
+
+Ray create_ray(vec2 rg) {
+	float r = ubo.width / 2.0;
+	float b = ubo.height / 2.0;
+	float l = -1.0 * r;
+	float t = -1.0 * b;
+    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
+    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
+	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
+    Ray ray;
+    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
+    ray.position = ubo.position;
+    return ray;
+}
+
+float luminance(vec3 c) {
+    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
+}
+
+bool finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
+    return position + normal * (dot(normal, direction) >= 0.0 ? EPS : -EPS);
+}
+
+bool right_side() {
+    return ubo.showdivider != 0 && int(gl_GlobalInvocationID.x % uint(ubo.width)) > int(ubo.divider);
+}
+
+bool restir_enabled() {
+    return (right_side() ? ubo.restirright : ubo.restir) != 0;
+}
+
+bool valid_temporal_candidate(RayGenerator rg) {
+    return rg.temporal_M > 0 &&
+        rg.temporal_W > 0.0 &&
+        finite_vec3(rg.temporal_Lo) &&
+        luminance(rg.temporal_Lo) > EPS &&
+        length(rg.temporal_n_v) > EPS &&
+        length(rg.temporal_n_s) > EPS &&
+        length(rg.temporal_x_s - rg.temporal_x_v) > EPS;
+}
+
+bool exportable_temporal_candidate(RayGenerator rg) {
+    uint required = RESTIR_FLAG_EXPORTABLE | RESTIR_FLAG_DIFFUSE_REUSE;
+    return valid_temporal_candidate(rg) &&
+        (rg.temporal_flags & required) == required;
+}
+
+vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
+    return ((material.diffuse / PI) +
+        (material.specular * (material.shiny + 2.0) /
+        (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
+        max(0.0, dot(incoming, normal));
+}
+
+float target_luminance_at_visible(vec3 x_v, vec3 n_v, uint material_index, vec3 x_s, vec3 Lo) {
+    if (length(x_s - x_v) <= EPS) return 0.0;
+    return restir_contribution_target_luminance(x_v, n_v, x_s, Lo, materialIn[material_index]);
+}
+
+bool visible_reconnection(vec3 x_v, vec3 n_v, vec3 x_s) {
+    vec3 delta = x_s - x_v;
+    float sample_dist = length(delta);
+    if (sample_dist <= EPS) return false;
+    vec3 direction = delta / sample_dist;
+    Ray ray = { restir_offset_ray_origin(x_v, n_v, direction), direction };
+    return !traceAny(ray, sample_dist - EPS);
+}
+
+bool valid_gi_sample_for_surface(vec3 x_v, vec3 n_v, uint material_index, vec3 x_s, vec3 n_s, vec3 Lo) {
+    if (!finite_vec3(x_s) || !finite_vec3(n_s) || length(n_s) <= EPS) return false;
+    if (target_luminance_at_visible(x_v, n_v, material_index, x_s, Lo) <= EPS) return false;
+    return visible_reconnection(x_v, n_v, x_s);
+}
+
+void clear_spatial(inout RayGenerator rg) {
+    rg.spatial_x_v = rg.temporal_x_v;
+    rg.spatial_n_v = rg.temporal_n_v;
+    rg.spatial_x_s = vec3(0.0);
+    rg.spatial_n_s = vec3(0.0);
+    rg.spatial_Lo = vec3(0.0);
+    rg.spatial_w = 0.0;
+    rg.spatial_M = 0;
+    rg.spatial_W = 0.0;
+    rg.spatial_flags = 0u;
+}
+
+float temporal_weighted_luminance(RayGenerator rg) {
+    float phat = target_luminance_at_visible(rg.temporal_x_v, rg.temporal_n_v, rg.initial_mat, rg.temporal_x_s, rg.temporal_Lo);
+    return max(0.0, phat * rg.temporal_W);
+}
+
+void apply_boiling_filter(inout RayGenerator rg, int rx, int ry) {
+    if (!ENABLE_BOILING_FILTER || !valid_temporal_candidate(rg)) return;
+    float current = temporal_weighted_luminance(rg);
+    if (current <= EPS) return;
+    float neighbor_sum = 0.0;
+    uint neighbor_count = 0u;
+    for (int oy = -1; oy <= 1; oy++) {
+        for (int ox = -1; ox <= 1; ox++) {
+            if (ox == 0 && oy == 0) continue;
+            int nx = rx + ox;
+            int ny = ry + oy;
+            if (nx < 0 || nx >= int(ubo.width) || ny < 0 || ny >= int(ubo.height)) continue;
+            RayGenerator ng = raygenIn[uint(ny) * uint(ubo.width) + uint(nx)];
+            if (!valid_temporal_candidate(ng)) continue;
+            if (dot(rg.temporal_n_v, ng.temporal_n_v) < ubo.normalthreshold) continue;
+            neighbor_sum += temporal_weighted_luminance(ng);
+            neighbor_count++;
+        }
+    }
+    if (neighbor_count == 0u) return;
+    float neighbor_avg = neighbor_sum / float(neighbor_count);
+    float threshold = max(neighbor_avg * BOILING_FILTER_STRENGTH, EPS);
+    if (current > threshold) {
+        float scale = threshold / current;
+        rg.temporal_w *= scale;
+        rg.temporal_W *= scale;
+    }
+}
+
+void spatial_resample(int rx, int ry) {
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    apply_boiling_filter(rg, rx, ry);
+    if (rg.initial_pdf == 1.0 && finite_vec3(rg.temporal_Lo) && luminance(rg.temporal_Lo) > EPS) {
+        rg.spatial_x_v = rg.temporal_x_v;
+        rg.spatial_n_v = rg.temporal_n_v;
+        rg.spatial_x_s = rg.temporal_x_s;
+        rg.spatial_n_s = rg.temporal_n_s;
+        rg.spatial_Lo = rg.temporal_Lo;
+        rg.spatial_w = rg.temporal_w;
+        rg.spatial_M = max(rg.temporal_M, 1u);
+        rg.spatial_W = max(rg.temporal_W, 1.0);
+        rg.spatial_flags = rg.temporal_flags;
+        raygenIn[gl_GlobalInvocationID.x] = rg;
+        return;
+    }
+    if (!valid_temporal_candidate(rg)) {
+        clear_spatial(rg);
+        raygenIn[gl_GlobalInvocationID.x] = rg;
+        return;
+    }
+
+    float base_phat = target_luminance_at_visible(rg.temporal_x_v, rg.temporal_n_v, rg.initial_mat, rg.temporal_x_s, rg.temporal_Lo);
+    float base_w = base_phat * rg.temporal_W * float(rg.temporal_M);
+    if (base_w <= EPS || isnan(base_w) || isinf(base_w)) {
+        clear_spatial(rg);
+        raygenIn[gl_GlobalInvocationID.x] = rg;
+        return;
+    }
+
+    rg.spatial_x_v = rg.temporal_x_v;
+    rg.spatial_n_v = rg.temporal_n_v;
+    rg.spatial_x_s = rg.temporal_x_s;
+    rg.spatial_n_s = rg.temporal_n_s;
+    rg.spatial_Lo = rg.temporal_Lo;
+    rg.spatial_w = base_w;
+    rg.spatial_M = rg.temporal_M;
+    rg.spatial_W = 0.0;
+    rg.spatial_flags = rg.temporal_flags;
+
+    uint accepted_indices[MAX_SPATIAL_CANDIDATES + 1];
+    uint accepted_count = 0u;
+    accepted_indices[accepted_count++] = gl_GlobalInvocationID.x;
+
+    float depth = length(rg.temporal_x_v - ubo.position);
+    if (depth <= EPS) {
+        clear_spatial(rg);
+        raygenIn[gl_GlobalInvocationID.x] = rg;
+        return;
+    }
+
+    uint candidate_count = min(ubo.spacecount, uint(MAX_SPATIAL_CANDIDATES));
+    for (uint i = 0; i < candidate_count; i++) {
+        // get a random coord from within range
+        int nx = rx + min(int(random() * float(ubo.spacerange)), int(ubo.spacerange) - 1) - (int(ubo.spacerange)/2);
+        int ny = ry + min(int(random() * float(ubo.spacerange)), int(ubo.spacerange) - 1) - (int(ubo.spacerange)/2);
+        if (nx < 0 || nx >= int(ubo.width) || ny < 0 || ny >= int(ubo.height)) continue;
+        int ncoord = int(ny * ubo.width + nx);
+        RayGenerator ng = raygenIn[ncoord];
+
+        // hit check
+        if (!exportable_temporal_candidate(ng)) continue;
+
+        // depth similarity
+        float ndepth = length(ng.temporal_x_v - ubo.position);
+        if (abs(depth - ndepth) / depth > ubo.depththreshold) continue;
+
+        // normal similarity
+        if (dot(rg.temporal_n_v, ng.temporal_n_v) < ubo.normalthreshold) continue;
+
+        // calculate phat
+        if (!valid_gi_sample_for_surface(
+            rg.temporal_x_v,
+            rg.temporal_n_v,
+            rg.initial_mat,
+            ng.temporal_x_s,
+            ng.temporal_n_s,
+            ng.temporal_Lo)) continue;
+        float phat = target_luminance_at_visible(rg.temporal_x_v, rg.temporal_n_v, rg.initial_mat, ng.temporal_x_s, ng.temporal_Lo);
+
+        // visibility check
+        float jacobian_correction = restir_reconnection_correction(
+            ng.temporal_x_v,
+            rg.temporal_x_v,
+            ng.temporal_x_s,
+            ng.temporal_n_s);
+        if (jacobian_correction <= EPS || isnan(jacobian_correction) || isinf(jacobian_correction)) continue;
+        phat *= jacobian_correction;
+        if (phat <= EPS || isnan(phat) || isinf(phat)) continue;
+
+        // merge
+        float wnew = phat * ng.temporal_W * ng.temporal_M;
+        if (wnew <= EPS || isnan(wnew) || isinf(wnew)) continue;
+        if (accepted_count < uint(MAX_SPATIAL_CANDIDATES + 1)) {
+            accepted_indices[accepted_count++] = uint(ncoord);
+        }
+        rg.spatial_w += wnew;
+        if (random() < wnew / rg.spatial_w) {
+            rg.spatial_x_v = rg.temporal_x_v;
+            rg.spatial_n_v = rg.temporal_n_v;
+            rg.spatial_x_s = ng.temporal_x_s;
+            rg.spatial_n_s = ng.temporal_n_s;
+            rg.spatial_Lo = ng.temporal_Lo;
+            rg.spatial_flags = ng.temporal_flags;
+        }
+        rg.spatial_M += ng.temporal_M;
+    }
+
+    if (rg.spatial_M > 0u) {
+        float validM = 0.0;
+        for (uint i = 0u; i < accepted_count; i++) {
+            RayGenerator candidate = raygenIn[accepted_indices[i]];
+            if (!valid_temporal_candidate(candidate)) continue;
+            if (!valid_gi_sample_for_surface(
+                candidate.temporal_x_v,
+                candidate.temporal_n_v,
+                candidate.initial_mat,
+                rg.spatial_x_s,
+                rg.spatial_n_s,
+                rg.spatial_Lo)) continue;
+            float phat = target_luminance_at_visible(
+                candidate.temporal_x_v,
+                candidate.temporal_n_v,
+                candidate.initial_mat,
+                rg.spatial_x_s,
+                rg.spatial_Lo);
+            if (phat > EPS) validM += float(max(candidate.temporal_M, 1u));
+        }
+        if (validM > EPS && validM < float(rg.spatial_M)) {
+            rg.spatial_w *= validM / float(rg.spatial_M);
+            rg.spatial_M = max(uint(validM), 1u);
+        }
+    }
+
+    if (rg.spatial_M > ubo.spatial_m_cap) {
+        float oldM = float(rg.spatial_M);
+        rg.spatial_M = max(ubo.spatial_m_cap, 1u);
+        rg.spatial_w *= float(rg.spatial_M) / oldM;
+    }
+    float phat_z = target_luminance_at_visible(rg.temporal_x_v, rg.temporal_n_v, rg.initial_mat, rg.spatial_x_s, rg.spatial_Lo);
+    if (rg.spatial_M == 0 || phat_z <= EPS || rg.spatial_w <= EPS || !finite_vec3(rg.spatial_Lo)) {
+        rg.spatial_W = 0.0;
+        rg.spatial_flags = 0u;
+    } else {
+        rg.spatial_W = rg.spatial_w / (float(rg.spatial_M) * phat_z);
+    }
+    raygenIn[gl_GlobalInvocationID.x] = rg;
+}
+
+void main() {
+    uint pixelCount = uint(ubo.width) * uint(ubo.height);
+    if (gl_GlobalInvocationID.x >= pixelCount) return;
+    int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
+    init_random(rx, ry);
+    if (!restir_enabled()) return;
+    spatial_resample(rx, ry);
+}

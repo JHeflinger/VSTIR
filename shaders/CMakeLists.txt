@@ -9,7 +9,8 @@ if(NOT GLSLC)
     message(FATAL_ERROR "glslc not found — install the Vulkan SDK")
 endif()
 
-file(GLOB SHADER_SOURCES "*.vert" "*.frag" "*.comp")
+file(GLOB SHADER_SOURCES CONFIGURE_DEPENDS "*.vert" "*.frag" "*.comp")
+file(GLOB SHADER_INCLUDES CONFIGURE_DEPENDS "*.glsl")
 
 set(SPIRV_OUTPUTS)
 foreach(SHADER ${SHADER_SOURCES})
@@ -19,8 +20,8 @@ foreach(SHADER ${SHADER_SOURCES})
     add_custom_command(
         OUTPUT  ${SPIRV}
         COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/bin/shaders"
-        COMMAND ${GLSLC} ${SHADER} -o ${SPIRV}
-        DEPENDS ${SHADER}
+        COMMAND ${GLSLC} -I ${CMAKE_CURRENT_SOURCE_DIR} ${SHADER} -o ${SPIRV}
+        DEPENDS ${SHADER} ${SHADER_INCLUDES}
         VERBATIM
     )
     list(APPEND SPIRV_OUTPUTS ${SPIRV})

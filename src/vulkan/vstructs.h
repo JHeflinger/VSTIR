@@ -18,6 +18,7 @@ namespace VSTIR {
         alignas(16) glm::vec3 initial_Lo;
         alignas(4) float initial_pdf;
         alignas(4) uint32_t initial_mat;
+        alignas(4) uint32_t initial_flags;
         alignas(16) glm::vec3 temporal_x_v;
         alignas(16) glm::vec3 temporal_n_v;
         alignas(16) glm::vec3 temporal_x_s;
@@ -26,16 +27,21 @@ namespace VSTIR {
         alignas(4) float temporal_w;
         alignas(4) uint32_t temporal_M;
         alignas(4) float temporal_W;
-        alignas(16) glm::vec3 spacial_x_v;
-        alignas(16) glm::vec3 spacial_n_v;
-        alignas(16) glm::vec3 spacial_x_s;
-        alignas(16) glm::vec3 spacial_n_s;
-        alignas(16) glm::vec3 spacial_Lo;
-        alignas(4) float spacial_w;
-        alignas(4) uint32_t spacial_M;
-        alignas(4) float spacial_W;
+        alignas(4) uint32_t temporal_flags;
+        alignas(16) glm::vec3 spatial_x_v;
+        alignas(16) glm::vec3 spatial_n_v;
+        alignas(16) glm::vec3 spatial_x_s;
+        alignas(16) glm::vec3 spatial_n_s;
+        alignas(16) glm::vec3 spatial_Lo;
+        alignas(4) float spatial_w;
+        alignas(4) uint32_t spatial_M;
+        alignas(4) float spatial_W;
+        alignas(4) uint32_t spatial_flags;
         alignas(16) glm::vec3 direct;
         alignas(16) glm::vec3 filtered;
+        alignas(16) glm::vec3 filtered_tmp;
+        alignas(16) glm::vec3 direct_filtered;
+        alignas(16) glm::vec3 direct_filtered_tmp;
     };
 
     typedef enum {
@@ -46,7 +52,6 @@ namespace VSTIR {
 
     struct CPUSwap {
 	    size_t index;
-        void* reference;
     };
 
     struct VExtensionData {
@@ -138,16 +143,25 @@ namespace VSTIR {
         alignas(4) float width;
         alignas(4) float height;
         alignas(16) glm::mat4 previousvpm;
+        alignas(16) glm::mat4 currentvpm;
         alignas(4) float depththreshold;
         alignas(4) float normalthreshold;
-        alignas(4) uint32_t contributioncap;
-        alignas(4) uint32_t candidatecap;
+        alignas(4) uint32_t temporal_m_cap;
+        alignas(4) uint32_t spatial_m_cap;
         alignas(4) uint32_t spacerange;
         alignas(4) uint32_t spacecount;
+        alignas(4) uint32_t restir_bounces;
         alignas(4) uint32_t emissivecount;
         alignas(4) uint32_t directlighting;
         alignas(4) uint32_t divider;
         alignas(4) uint32_t filters;
+        alignas(4) uint32_t restir;
+        alignas(4) uint32_t showdivider;
+        alignas(4) uint32_t directlightingright;
+        alignas(4) uint32_t filtersright;
+        alignas(4) uint32_t restirright;
+        alignas(4) uint32_t restirframes;
+        alignas(4) uint32_t resetreservoirs;
     };
 
     struct VulkanSwapchain {

@@ -1,110 +1,8 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
+#include "common.glsl"
 
-#define MAX_RECURSIVE_DEPTH 2000
 #define EPS 0.000001
-#define FLTMAX 3.402823466e+38
-
-#define LAMBERTIAN_MODEL 2
-#define MIRROR_MODEL 5
-#define DIELECTRIC_MODEL 7
-
-struct Triangle {
-    uint a;
-    uint b;
-    uint c;
-    uint an;
-    uint bn;
-    uint cn;
-    uint material;
-};
-
-struct NodeBVH {
-    vec3 min;
-    vec3 max;
-    uint config;
-    uint left;
-    uint right;
-};
-
-struct Ray {
-    vec3 position;
-    vec3 direction;
-};
-
-struct Hit {
-    float distance;
-    uint material;
-    vec3 normal;
-    vec3 position;
-};
-
-struct Material {
-    vec3 emission;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    vec3 absorbtion;
-    vec3 dispersion;
-    float ior;
-    float shiny;
-    uint model;
-};
-
-struct RayGenerator {
-    vec3 rawaccumulation;
-    vec3 accumulation;
-    vec3 initial_x_v;
-    vec3 initial_n_v;
-    vec3 initial_x_s;
-    vec3 initial_n_s;
-    vec3 initial_Lo;
-    float initial_pdf;
-    uint initial_mat;
-    vec3 temporal_x_v;
-    vec3 temporal_n_v;
-    vec3 temporal_x_s;
-    vec3 temporal_n_s;
-    vec3 temporal_Lo;
-    float temporal_w;
-    uint temporal_M;
-    float temporal_W;
-    vec3 spacial_x_v;
-    vec3 spacial_n_v;
-    vec3 spacial_x_s;
-    vec3 spacial_n_s;
-    vec3 spacial_Lo;
-    float spacial_w;
-    uint spacial_M;
-    float spacial_W;
-    vec3 direct;
-    vec3 filtered;
-};
-
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    uint triangles;
-    uint seed;
-    uint samples;
-    float fov;
-    float width;
-    float height;
-    mat4 previousvpm;
-    float depththreshold;
-    float normalthreshold;
-    uint contributioncap;
-    uint candidatecap;
-    uint spacerange;
-    uint spacecount;
-    uint emissivecount;
-    uint directlighting;
-    uint divider;
-    uint filters;
-} ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
@@ -134,228 +32,89 @@ layout(binding = 7, rgba8) uniform image2D restirImage;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-const float max_contribution = 10;
+#include "bvh.glsl"
+
 const float PI = 3.14159265358979323846;
-uvec4 seed = uvec4(0);
 
-float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
-    cosi = clamp(cosi, -1.0, 1.0);
-    bool entering = cosi > 0.0;
-    if (!entering) {
-        float tmp = ior_i;
-        ior_i = ior_t;
-        ior_t = tmp;
-        cosi *= -1.0;
-    }
-    float sint = ior_i / ior_t * sqrt(max(0.0, 1.0 - cosi * cosi));
-    if (sint >= 1.0) return 1.0; // total internal reflection
-    float cost = sqrt(max(0.0, 1.0 - sint * sint));
-    float Rs = (ior_t * cosi - ior_i * cost) / (ior_t * cosi + ior_i * cost);
-    float Rp = (ior_i * cosi - ior_t * cost) / (ior_i * cosi + ior_t * cost);
-    return 0.5 * (Rs * Rs + Rp * Rp);
+bool finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
 }
 
-vec3 background_color(Ray ray) {
-    return vec3(0.0);
+bool right_side() {
+    return ubo.showdivider != 0 && int(gl_GlobalInvocationID.x % uint(ubo.width)) > int(ubo.divider);
 }
 
-float noise(float n) {
-	return fract(n*17.0*fract(n*0.3183099));
+bool restir_enabled() {
+    return (right_side() ? ubo.restirright : ubo.restir) != 0;
 }
 
-void init_random(int x, int y) {
-    seed = uvec4(x, y, ubo.seed, x + y);
+bool filter_enabled() {
+    return ((right_side() ? ubo.filtersright : ubo.filters) & 1u) != 0;
 }
 
-void pcg4d(inout uvec4 v) {
-    v = v * 1664525u + 1013904223u;
-    v.x += v.y * v.w;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v.w += v.y * v.z;
-    v = v ^ (v >> 16u);
-    v.x += v.y * v.w;
-    v.y += v.z * v.x;
-    v.z += v.x * v.y;
-    v.w += v.y * v.z;
+vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
+    return position + normal * (dot(normal, direction) >= 0.0 ? EPS : -EPS);
 }
 
-float random() {
-    pcg4d(seed);
-    return float(seed.x) / float(0xffffffffu);
-}
-
-float luminance(vec3 c) {
-    return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
-}
-
-vec3 beer_lambert(uint material, float dist) {
-    return exp(-materialIn[material].absorbtion * dist);
-}
-
-Ray create_ray(vec2 rg) {
-	float r = ubo.width / 2.0;
-	float b = ubo.height / 2.0;
-	float l = -1.0 * r;
-	float t = -1.0 * b;
-    float u = l + ((r - l) * (float(rg.x) + 0.5)) / ubo.width;
-    float v = b + ((t - b) * (float(rg.y) + 0.5)) / ubo.height;
-	float d = (cos(ubo.fov / 2.0) / sin(ubo.fov / 2.0)) * r;
-    Ray ray;
-    ray.direction = normalize((ubo.u * u) + (ubo.v * v) - (ubo.w * d));
-    ray.position = ubo.position;
-    return ray;
-}
-
-bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
-    Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vertexIn[tri.a];
-    vec3 _b = vertexIn[tri.b];
-    vec3 _c = vertexIn[tri.c];
-    vec3 e1 = _b - _a;
-    vec3 e2 = _c - _a;
-    vec3 h = cross(ray.direction, e2);
-    float a = dot(e1, h);
-    if (abs(a) < EPS) return false;
-    float f = 1.0 / a;
-    vec3 s = ray.position - _a;
-    float u = f*dot(s, h);
-    if (u < 0.0 || u > 1.0) return false;
-    vec3 q = cross(s, e1);
-    float v = f*dot(ray.direction, q);
-    if (v < 0.0 || u + v > 1.0) return false;
-    hit.distance = f * dot(e2, q);
-    if (hit.distance <= EPS) return false;
-    hit.material = tri.material;
-    hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
-    else hit.normal = normalize(cross(e1, e2));
-    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
-    return true;
-}
-
-bool aabb_intersect(Ray ray, uint node_ind) {
-	vec3 dfrac = 1.0 / ray.direction;
-    vec3 mindif = (bvhIn[node_ind].min - ray.position)*dfrac;
-    vec3 maxdif = (bvhIn[node_ind].max - ray.position)*dfrac;
-	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
-	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
-    return tmax >= 0 && tmin <= tmax;
-}
-
-Hit trace(Ray ray, inout uint hit_id) {
-    Hit hit;
-    hit.distance = -1.0;
-    if (ubo.triangles == 0) return hit;
-    if (!aabb_intersect(ray, 0)) return hit;
-    uint stack[MAX_RECURSIVE_DEPTH];
-    int stack_ptr = 0;
-    stack[stack_ptr++] = 0;
-    while (stack_ptr > 0) {
-        NodeBVH node = bvhIn[stack[--stack_ptr]];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { break; }
-        if (node.config == 0) {
-            Hit trihit;
-            if (triangle_intersect(ray, node.left, trihit)) {
-                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
-                    hit = trihit;
-					hit_id = node.left;
-                }
-            }
-        } else if (node.config == 1) {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-        } else if (node.config == 2) {
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        } else {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        }
-    }
-    return hit;
-}
-
-vec3 onb(vec3 normal, vec3 local) {
-	vec3 w = normal;
-	vec3 a = (abs(w.x) > 0.9) ? vec3(0, 1, 0) : vec3(1, 0, 0);
-	vec3 v = normalize(cross(w, a));
-	vec3 u = normalize(cross(w, v));
-	return normalize(local.x*u + local.y*v + local.z*w);
-}
-
-vec3 sample_cosine_weighted_lobe() {
-    float r1 = random();
-    float r2 = random();
-    float sqr2 = sqrt(r2);
-    float phi = 2.0 * PI * r1;
-    return vec3(cos(phi)*sqr2, sin(phi)*sqr2, sqrt(1.0 - r2));
-}
-
-vec3 sample_specular_phong_lobe(float shiny) {
-    float r1 = random();
-    float r2 = random();
-    float phi = 2.0 * PI * r1;
-    float costheta = pow(r2, 1.0 / (shiny + 1.0));
-    float sintheta = sqrt(1.0 - costheta * costheta);
-    return vec3(cos(phi) * sintheta, sin(phi) * sintheta, costheta);
-}
-
-float diffuse_pdf(vec3 normal, vec3 incoming) {
-    return max(0.0, dot(normal, incoming)) / PI;
-}
-
-float specular_pdf(vec3 incoming, vec3 R, float shiny) {
-    float cosalpha = max(dot(R, incoming), 0.0);
-    return (shiny + 1.0) * pow(cosalpha, shiny) / (2.0 * PI);
-}
-
-bool refract_ray(vec3 outgoing, vec3 normal, float eta, out vec3 incoming) {
-    float cosi = clamp(dot(-outgoing, normal), -1, 1);
-    float k = 1.0 - (eta * eta * (1.0 - cosi * cosi));
-    if (k < 0.0) return false;
-    float cost = sqrt(k);
-    incoming = normalize(eta * (outgoing) + ((eta * cosi - cost) * normal));
-    return true;
-}
-
-vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
+vec3 full_brdf_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, in Material material) {
     return ((material.diffuse / PI) +
         (material.specular * (material.shiny + 2.0) /
         (2.0 * PI) * pow(max(dot(reflect(-outgoing, normal), incoming), 0.0), material.shiny))) *
         max(0.0, dot(incoming, normal));
 }
 
-float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal, in Material material) {
-    float ks = luminance(material.specular);
-    float kd = luminance(material.diffuse);
-    float kskd = ks + kd;
-    float pd = kd/kskd;
-    float ps = ks/kskd;
-    vec3 R = reflect(-outgoing, normal);
-    return (pd * diffuse_pdf(normal, incoming) + ps * specular_pdf(incoming, R, material.shiny));
+bool visible_reconnection(vec3 x_v, vec3 n_v, vec3 x_s) {
+    vec3 delta = x_s - x_v;
+    float sample_dist = length(delta);
+    if (sample_dist <= EPS) return false;
+    vec3 direction = delta / sample_dist;
+    Ray ray = { offset_ray_origin(x_v, n_v, direction), direction };
+    return !traceAny(ray, sample_dist - EPS);
 }
 
-vec3 compile_resevoir() {
+vec3 local_initial_indirect(RayGenerator rg) {
+    if (rg.initial_pdf <= EPS ||
+        !finite_vec3(rg.initial_Lo) ||
+        length(rg.initial_x_s - rg.initial_x_v) <= EPS ||
+        length(ubo.position - rg.initial_x_v) <= EPS) {
+        return vec3(0.0);
+    }
+    vec3 wi = normalize(rg.initial_x_s - rg.initial_x_v);
+    vec3 wo = normalize(ubo.position - rg.initial_x_v);
+    vec3 indirect = full_brdf_throughput(wo, rg.initial_n_v, wi, materialIn[rg.initial_mat]) * rg.initial_Lo / rg.initial_pdf;
+    return finite_vec3(indirect) ? indirect : vec3(0.0);
+}
+
+vec3 compile_reservoir() {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
-    if (rg.initial_pdf == 1.0) return rg.spacial_Lo;
-    vec3 wi = normalize(rg.spacial_x_s - rg.spacial_x_v);
-    vec3 wo = normalize(ubo.position - rg.spacial_x_v);
-    vec3 brdf_cos = lambertian_throughput(wo, rg.spacial_n_v, wi, materialIn[rg.initial_mat]);
-    vec3 f = brdf_cos * rg.spacial_Lo;
-    return f * rg.spacial_W + rg.direct;
+    if (rg.initial_pdf == 1.0) return rg.initial_Lo;
+    Material visible_material = materialIn[rg.initial_mat];
+    if (!restir_diffuse_safe_material(visible_material)) {
+        return local_initial_indirect(rg) + rg.direct;
+    }
+    if (rg.spatial_M == 0 ||
+        rg.spatial_W <= 0.0 ||
+        !finite_vec3(rg.spatial_Lo) ||
+        length(rg.spatial_x_s - rg.spatial_x_v) <= EPS ||
+        length(ubo.position - rg.spatial_x_v) <= EPS ||
+        !visible_reconnection(rg.spatial_x_v, rg.spatial_n_v, rg.spatial_x_s)) {
+        return local_initial_indirect(rg) + rg.direct;
+    }
+    vec3 wi = normalize(rg.spatial_x_s - rg.spatial_x_v);
+    vec3 brdf_cos = restir_diffuse_throughput(rg.spatial_n_v, wi, visible_material);
+    vec3 f = brdf_cos * rg.spatial_Lo;
+    vec3 indirect = f * rg.spatial_W;
+    if (!finite_vec3(indirect)) indirect = vec3(0.0);
+    return indirect + rg.direct;
 }
 
 void main() {
-    if (ubo.filters != 0) return;
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-    init_random(rx, ry);
-    vec3 color = compile_resevoir();
+    if (!restir_enabled() || filter_enabled()) return;
+    vec3 color = compile_reservoir();
     if (ubo.samples == 0) raygenIn[gl_GlobalInvocationID.x].accumulation = vec3(0);
     raygenIn[gl_GlobalInvocationID.x].accumulation += color;
     color = raygenIn[gl_GlobalInvocationID.x].accumulation;

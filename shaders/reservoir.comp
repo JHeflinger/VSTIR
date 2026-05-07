@@ -1,111 +1,13 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
+#include "common.glsl"
 
-#define MAX_RECURSIVE_DEPTH 2000
 #define MAX_BOUNCES 10
 #define EPS 0.000001
-#define FLTMAX 3.402823466e+38
 
 #define LAMBERTIAN_MODEL 2
 #define MIRROR_MODEL 5
 #define DIELECTRIC_MODEL 7
-
-struct Triangle {
-    uint a;
-    uint b;
-    uint c;
-    uint an;
-    uint bn;
-    uint cn;
-    uint material;
-};
-
-struct NodeBVH {
-    vec3 min;
-    vec3 max;
-    uint config;
-    uint left;
-    uint right;
-};
-
-struct Ray {
-    vec3 position;
-    vec3 direction;
-};
-
-struct Hit {
-    float distance;
-    uint material;
-    vec3 normal;
-    vec3 position;
-};
-
-struct Material {
-    vec3 emission;
-    vec3 ambient;
-    vec3 diffuse;
-    vec3 specular;
-    vec3 absorbtion;
-    vec3 dispersion;
-    float ior;
-    float shiny;
-    uint model;
-};
-
-struct RayGenerator {
-    vec3 rawaccumulation;
-    vec3 accumulation;
-    vec3 initial_x_v;
-    vec3 initial_n_v;
-    vec3 initial_x_s;
-    vec3 initial_n_s;
-    vec3 initial_Lo;
-    float initial_pdf;
-    uint initial_mat;
-    vec3 temporal_x_v;
-    vec3 temporal_n_v;
-    vec3 temporal_x_s;
-    vec3 temporal_n_s;
-    vec3 temporal_Lo;
-    float temporal_w;
-    uint temporal_M;
-    float temporal_W;
-    vec3 spacial_x_v;
-    vec3 spacial_n_v;
-    vec3 spacial_x_s;
-    vec3 spacial_n_s;
-    vec3 spacial_Lo;
-    float spacial_w;
-    uint spacial_M;
-    float spacial_W;
-    vec3 direct;
-    vec3 filtered;
-};
-
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    uint triangles;
-    uint seed;
-    uint samples;
-    float fov;
-    float width;
-    float height;
-    mat4 previousvpm;
-    float depththreshold;
-    float normalthreshold;
-    uint contributioncap;
-    uint candidatecap;
-    uint spacerange;
-    uint spacecount;
-    uint emissivecount;
-    uint directlighting;
-    uint divider;
-    uint filters;
-} ubo;
 
 layout(binding = 1) readonly buffer TriangleSSBOIn {
     Triangle triangleIn[ ];
@@ -137,8 +39,11 @@ layout(binding = 7) buffer EmissivesSSBOIn {
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
+#include "bvh.glsl"
+
 const float max_contribution = 10;
 const float PI = 3.14159265358979323846;
+const uint NO_MEDIUM = 0xffffffffu;
 uvec4 seed = uvec4(0);
 
 float fresnel_dielectric(float cosi, float ior_i, float ior_t) {
@@ -192,6 +97,38 @@ float luminance(vec3 c) {
     return 0.2126*c.x + 0.7152*c.y + 0.0722*c.z;
 }
 
+bool finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+bool valid_radiance(vec3 v) {
+    return finite_vec3(v) && luminance(v) > EPS;
+}
+
+vec3 clamp_contribution(vec3 v) {
+    if (!finite_vec3(v)) return vec3(0.0);
+    v = max(v, vec3(0.0));
+    float peak = max(max(v.r, v.g), v.b);
+    if (peak <= max_contribution) return v;
+    return v * (max_contribution / peak);
+}
+
+vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
+    return position + normal * (dot(normal, direction) >= 0.0 ? EPS : -EPS);
+}
+
+bool right_side() {
+    return ubo.showdivider != 0 && int(gl_GlobalInvocationID.x % uint(ubo.width)) > int(ubo.divider);
+}
+
+bool direct_enabled() {
+    return (right_side() ? ubo.directlightingright : ubo.directlighting) != 0;
+}
+
+bool restir_enabled() {
+    return (right_side() ? ubo.restirright : ubo.restir) != 0;
+}
+
 vec3 beer_lambert(uint material, float dist) {
     return exp(-materialIn[material].absorbtion * dist);
 }
@@ -210,75 +147,29 @@ Ray create_ray(vec2 rg) {
     return ray;
 }
 
-bool triangle_intersect(Ray ray, uint triangle_ind, inout Hit hit) {
-    Triangle tri = triangleIn[triangle_ind];
-    vec3 _a = vertexIn[tri.a];
-    vec3 _b = vertexIn[tri.b];
-    vec3 _c = vertexIn[tri.c];
-    vec3 e1 = _b - _a;
-    vec3 e2 = _c - _a;
-    vec3 h = cross(ray.direction, e2);
-    float a = dot(e1, h);
-    if (abs(a) < EPS) return false;
-    float f = 1.0 / a;
-    vec3 s = ray.position - _a;
-    float u = f*dot(s, h);
-    if (u < 0.0 || u > 1.0) return false;
-    vec3 q = cross(s, e1);
-    float v = f*dot(ray.direction, q);
-    if (v < 0.0 || u + v > 1.0) return false;
-    hit.distance = f * dot(e2, q);
-    if (hit.distance <= EPS) return false;
-    hit.material = tri.material;
-    hit.position = ray.position + (ray.direction * hit.distance);
-    if (tri.an != -1) hit.normal = normalize((1.0 - u - v)*normalIn[tri.an] + u*normalIn[tri.bn] + v*normalIn[tri.cn]);
-    else hit.normal = normalize(cross(e1, e2));
-    if (dot(hit.normal, -ray.direction) < 0.0) hit.normal = -hit.normal;
+bool primary_hit_matches(Hit center, int nx, int ny) {
+    if (nx < 0 || nx >= int(ubo.width) || ny < 0 || ny >= int(ubo.height)) return false;
+    Ray neighbor_ray = create_ray(vec2(nx, ny));
+    uint neighbor_id = -1;
+    Hit neighbor = trace(neighbor_ray, neighbor_id);
+    if (neighbor.distance <= 0.0) return false;
+    if (neighbor.material != center.material) return false;
+    if (dot(center.normal, neighbor.normal) < ubo.normalthreshold) return false;
+    float center_depth = length(center.position - ubo.position);
+    float neighbor_depth = length(neighbor.position - ubo.position);
+    if (center_depth <= EPS || abs(center_depth - neighbor_depth) / center_depth > ubo.depththreshold) return false;
     return true;
 }
 
-bool aabb_intersect(Ray ray, uint node_ind) {
-	vec3 dfrac = 1.0 / ray.direction;
-    vec3 mindif = (bvhIn[node_ind].min - ray.position)*dfrac;
-    vec3 maxdif = (bvhIn[node_ind].max - ray.position)*dfrac;
-	float tmin = max(max(min(mindif.x, maxdif.x), min(mindif.y, maxdif.y)), min(mindif.z, maxdif.z));
-	float tmax = min(min(max(mindif.x, maxdif.x), max(mindif.y, maxdif.y)), max(mindif.z, maxdif.z));
-    return tmax >= 0 && tmin <= tmax;
-}
-
-Hit trace(Ray ray, inout uint hit_id) {
-    Hit hit;
-    hit.distance = -1.0;
-    if (ubo.triangles == 0) return hit;
-    if (!aabb_intersect(ray, 0)) return hit;
-    uint stack[MAX_RECURSIVE_DEPTH];
-    int stack_ptr = 0;
-    stack[stack_ptr++] = 0;
-    while (stack_ptr > 0) {
-        NodeBVH node = bvhIn[stack[--stack_ptr]];
-        if (stack_ptr >= MAX_RECURSIVE_DEPTH - 1) { break; }
-        if (node.config == 0) {
-            Hit trihit;
-            if (triangle_intersect(ray, node.left, trihit)) {
-                if (hit.distance == -1.0 || trihit.distance < hit.distance) {
-                    hit = trihit;
-					hit_id = node.left;
-                }
-            }
-        } else if (node.config == 1) {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-        } else if (node.config == 2) {
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        } else {
-            if (aabb_intersect(ray, node.left))
-                stack[stack_ptr++] = node.left;
-            if (aabb_intersect(ray, node.right))
-                stack[stack_ptr++] = node.right;
-        }
+uint initial_export_flags(Hit center, int rx, int ry, bool sampled_diffuse_lobe) {
+    if (!sampled_diffuse_lobe || !restir_diffuse_safe_material(materialIn[center.material])) {
+        return 0u;
     }
-    return hit;
+    bool stable = primary_hit_matches(center, rx - 1, ry) &&
+        primary_hit_matches(center, rx + 1, ry) &&
+        primary_hit_matches(center, rx, ry - 1) &&
+        primary_hit_matches(center, rx, ry + 1);
+    return stable ? (RESTIR_FLAG_EXPORTABLE | RESTIR_FLAG_DIFFUSE_REUSE) : 0u;
 }
 
 float russian_roulette(vec3 throughput) {
@@ -319,6 +210,24 @@ float specular_pdf(vec3 incoming, vec3 R, float shiny) {
     return (shiny + 1.0) * pow(cosalpha, shiny) / (2.0 * PI);
 }
 
+float power_heuristic(float pdf_a, float pdf_b) {
+    float a2 = pdf_a * pdf_a;
+    float b2 = pdf_b * pdf_b;
+    float denom = a2 + b2;
+    return denom > EPS ? a2 / denom : 0.0;
+}
+
+float lambertian_pdf(in vec3 incoming, in vec3 outgoing, in vec3 normal, in Material material) {
+    float ks = luminance(material.specular);
+    float kd = luminance(material.diffuse);
+    float kskd = ks + kd;
+    if (kskd <= EPS) return 0.0;
+    float pd = kd / kskd;
+    float ps = ks / kskd;
+    vec3 R = reflect(-outgoing, normal);
+    return pd * diffuse_pdf(normal, incoming) + ps * specular_pdf(incoming, R, material.shiny);
+}
+
 bool refract_ray(vec3 outgoing, vec3 normal, float eta, out vec3 incoming) {
     float cosi = clamp(dot(-outgoing, normal), -1, 1);
     float k = 1.0 - (eta * eta * (1.0 - cosi * cosi));
@@ -335,16 +244,22 @@ vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, i
         max(0.0, dot(incoming, normal));
 }
 
-void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout int wavelength) {
+void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, out bool sampled_diffuse_lobe, inout float ior, inout uint medium, inout int wavelength) {
+    incoming = vec3(0.0);
+    pdf = 0.0;
+    throughput = vec3(0.0);
+    sampled_diffuse_lobe = false;
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             float ks = luminance(material.specular);
             float kd = luminance(material.diffuse);
             float kskd = ks + kd;
+            if (kskd <= EPS) break;
             float pd = kd/kskd;
             float ps = ks/kskd;
             vec3 R = reflect(-outgoing, h.normal);
-            incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
+            sampled_diffuse_lobe = random() < pd;
+            incoming = sampled_diffuse_lobe ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
             throughput = 
                 ((material.diffuse / PI) +
                 (material.specular * (material.shiny + 2.0) /
@@ -363,7 +278,7 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float eta_t = material.ior;
             float pdf_mod = 1.0;
             uint mat_t = h.material;
-            vec3 absorb = beer_lambert(medium, length(previous - h.position));
+            vec3 absorb = medium == NO_MEDIUM ? vec3(1.0) : beer_lambert(medium, length(previous - h.position));
             vec3 dmask = vec3(1.0);
             if (wavelength < 0 && material.dispersion != vec3(0)) {
                 pdf_mod = 0.33333333; // 1/3 chance to choose wavelength
@@ -374,7 +289,7 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             if (wavelength >= 0 && material.dispersion != vec3(0)) eta_t *= material.dispersion[wavelength];
             if (medium == mat_t) {
                 eta_t = 1.0;
-                mat_t = -1;
+                mat_t = NO_MEDIUM;
             }
             float F = fresnel_dielectric(cosi, eta_i, eta_t);
             if (random() < F) {
@@ -400,13 +315,22 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
     }
 }
 
-vec3 sample_direct_light_point(inout uint tid, inout float area) {
-    tid = emissiveIn[uint(random()*float(ubo.emissivecount))];
+float triangle_area(uint tid) {
     Triangle tri = triangleIn[tid];
     vec3 _a = vertexIn[tri.a].xyz;
     vec3 _b = vertexIn[tri.b].xyz;
     vec3 _c = vertexIn[tri.c].xyz;
-    area = length(cross(_b - _a, _c - _a)) * 0.5;
+    return length(cross(_b - _a, _c - _a)) * 0.5;
+}
+
+vec3 sample_direct_light_point(inout uint tid, inout float area) {
+    uint light_index = min(uint(random()*float(ubo.emissivecount)), ubo.emissivecount - 1u);
+    tid = emissiveIn[light_index];
+    area = triangle_area(tid);
+    Triangle tri = triangleIn[tid];
+    vec3 _a = vertexIn[tri.a].xyz;
+    vec3 _b = vertexIn[tri.b].xyz;
+    vec3 _c = vertexIn[tri.c].xyz;
     float r1 = sqrt(random());
     float r2 = random();
     float u = 1.0 - r1;
@@ -414,40 +338,71 @@ vec3 sample_direct_light_point(inout uint tid, inout float area) {
     return _a * (1.0 - u - v) + _b * u + _c * v;
 }
 
+float light_pdf_omega(uint tid, vec3 from_position, Hit light_hit) {
+    bool is_emissive = false;
+    for (uint i = 0u; i < ubo.emissivecount; i++) {
+        if (emissiveIn[i] == tid) {
+            is_emissive = true;
+            break;
+        }
+    }
+    if (!is_emissive) return 0.0;
+    float area = triangle_area(tid);
+    if (area <= EPS) return 0.0;
+    vec3 to_light = light_hit.position - from_position;
+    float dist2 = dot(to_light, to_light);
+    if (dist2 <= EPS) return 0.0;
+    vec3 dir = normalize(to_light);
+    float cos_light = max(dot(light_hit.normal, -dir), 0.0);
+    if (cos_light <= EPS) return 0.0;
+    return (1.0 / float(ubo.emissivecount)) / area * dist2 / cos_light;
+}
+
 vec3 sample_direct_light(vec3 outgoing, Hit h, Material material) {
+    if (ubo.emissivecount == 0) return vec3(0.0);
     uint eid;
     float area;
     vec3 pos = sample_direct_light_point(eid, area);
+    if (area <= EPS) return vec3(0.0);
     vec3 to_light = pos - h.position;
     float dist = length(to_light);
+    if (dist <= EPS) return vec3(0.0);
     to_light = normalize(to_light);
-    Ray sray = { h.position + to_light * EPS, to_light };
-    uint tid = 0;
-    Hit shit = trace(sray, tid);
-    if (eid != tid || shit.distance <= 0.0) return vec3(0.0);
-    vec3 emission = materialIn[shit.material].emission;
+    Ray sray = { offset_ray_origin(h.position, h.normal, to_light), to_light };
+    if (traceAny(sray, dist + EPS, eid)) return vec3(0.0);
+    Triangle light_triangle = triangleIn[eid];
+    vec3 emission = materialIn[light_triangle.material].emission;
     float p_triangle = 1.0 / float(ubo.emissivecount); // WARN: this is a uniform weight over all emissive triangles. If emissive triangles are of differing area, this will cause bias
     float p_area = p_triangle / area;
-    float cos_light = max(dot(shit.normal, -to_light), 0.0);
+    float cos_light = abs(dot(triangle_geometric_normal(eid), -to_light));
+    if (cos_light <= EPS) return vec3(0.0);
     float p_omega = p_area * dist * dist / cos_light;
-    float ks = luminance(material.specular);
-    float kd = luminance(material.diffuse);
-    float kskd = ks + kd;
-    float pd = kd/kskd;
-    float ps = ks/kskd;
-    return emission * lambertian_throughput(outgoing, h.normal, to_light, material) / (p_omega);
+    float p_bsdf = lambertian_pdf(to_light, outgoing, h.normal, material);
+    float mis = power_heuristic(p_omega, p_bsdf);
+    return clamp_contribution(emission * lambertian_throughput(outgoing, h.normal, to_light, material) * mis / p_omega);
 }
 
-vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
+vec3 pathtrace(
+    Ray ray,
+    inout uint hit_id,
+    inout float hit_distance,
+    float initial_bsdf_pdf,
+    vec3 initial_previous_position,
+    bool initial_direct_sampling) {
     vec3 throughput = vec3(1.0);
     vec3 radiance = vec3(0.0);
     bool firsthit = true;
     uint hid = -1;
     float ior = 1.0;
-    uint medium = -1;
+    uint medium = NO_MEDIUM;
     int wavelength = -1;
-    bool count_emission = ubo.directlighting == 0;
-    for (uint i = 0; i < MAX_BOUNCES; i++) {
+    bool count_emission = !direct_enabled();
+    bool previous_sampled_by_bsdf = initial_bsdf_pdf > EPS;
+    bool previous_direct_sampling = initial_direct_sampling;
+    float previous_bsdf_pdf = initial_bsdf_pdf;
+    vec3 previous_position = initial_previous_position;
+    uint max_bounces = clamp(ubo.restir_bounces, 1u, uint(MAX_BOUNCES));
+    for (uint i = 0; i < max_bounces; i++) {
         Hit h = trace(ray, hid);
         if (firsthit) {
             firsthit = false;
@@ -456,27 +411,38 @@ vec3 pathtrace(Ray ray, inout uint hit_id, inout float hit_distance) {
         }
         if (h.distance <= 0) break;
         Material material = materialIn[h.material];
-        if (material.emission != vec3(0.0) && count_emission) {
-            radiance += throughput * material.emission;
+        if (material.emission != vec3(0.0) && (count_emission || previous_sampled_by_bsdf)) {
+            float mis = 1.0;
+            if (direct_enabled() && previous_sampled_by_bsdf && previous_direct_sampling && ubo.emissivecount > 0) {
+                float p_light = light_pdf_omega(hid, previous_position, h);
+                mis = power_heuristic(previous_bsdf_pdf, p_light);
+            }
+            radiance += clamp_contribution(throughput * material.emission * mis);
             break;
         }
-        if (ubo.directlighting != 0 && material.model == LAMBERTIAN_MODEL && ubo.emissivecount > 0) {
+        if (direct_enabled() && material.model == LAMBERTIAN_MODEL && ubo.emissivecount > 0) {
             vec3 direct = sample_direct_light(-ray.direction, h, material);
-            radiance += min(throughput * direct, max_contribution);
+            radiance += clamp_contribution(throughput * direct);
         }
+        if (i + 1u >= max_bounces) break;
         vec3 incoming;
         vec3 color;
         float pdf;
-        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium, wavelength);
+        bool sampled_diffuse_lobe;
+        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, sampled_diffuse_lobe, ior, medium, wavelength);
         if (pdf <= 0) break;
         throughput *= color / pdf;
         throughput = min(throughput, max_contribution);
         float p = russian_roulette(throughput);
         if (random() > p) break;
         throughput /= p;
-        ray.position = h.position + (incoming * EPS);
+        previous_position = h.position;
+        previous_bsdf_pdf = pdf;
+        previous_sampled_by_bsdf = true;
+        previous_direct_sampling = material.model == LAMBERTIAN_MODEL && direct_enabled() && ubo.emissivecount > 0;
+        ray.position = offset_ray_origin(h.position, h.normal, incoming);
         ray.direction = incoming;
-        count_emission = ubo.emissivecount == 0 || ubo.directlighting == 0;
+        count_emission = ubo.emissivecount == 0 || !direct_enabled();
         if (material.model != LAMBERTIAN_MODEL) count_emission = true;
     }
     return radiance;
@@ -486,22 +452,45 @@ void soft_reset() {
     raygenIn[gl_GlobalInvocationID.x].temporal_M /= 2;
     raygenIn[gl_GlobalInvocationID.x].temporal_W /= 2;
     raygenIn[gl_GlobalInvocationID.x].temporal_w /= 2;
-    raygenIn[gl_GlobalInvocationID.x].spacial_M /= 2;
-    raygenIn[gl_GlobalInvocationID.x].spacial_W /= 2;
-    raygenIn[gl_GlobalInvocationID.x].spacial_w /= 2;
+    raygenIn[gl_GlobalInvocationID.x].spatial_M /= 2;
+    raygenIn[gl_GlobalInvocationID.x].spatial_W /= 2;
+    raygenIn[gl_GlobalInvocationID.x].spatial_w /= 2;
+}
+
+void clear_reservoirs(inout RayGenerator rg) {
+    rg.temporal_x_v = vec3(0.0);
+    rg.temporal_n_v = vec3(0.0);
+    rg.temporal_x_s = vec3(0.0);
+    rg.temporal_n_s = vec3(0.0);
+    rg.temporal_Lo = vec3(0.0);
+    rg.temporal_w = 0.0;
+    rg.temporal_M = 0;
+    rg.temporal_W = 0.0;
+    rg.temporal_flags = 0;
+    rg.spatial_x_v = vec3(0.0);
+    rg.spatial_n_v = vec3(0.0);
+    rg.spatial_x_s = vec3(0.0);
+    rg.spatial_n_s = vec3(0.0);
+    rg.spatial_Lo = vec3(0.0);
+    rg.spatial_w = 0.0;
+    rg.spatial_M = 0;
+    rg.spatial_W = 0.0;
+    rg.spatial_flags = 0;
 }
 
 void hard_reset() {
-    raygenIn[gl_GlobalInvocationID.x].temporal_M = 0;
-    raygenIn[gl_GlobalInvocationID.x].temporal_W = 0;
-    raygenIn[gl_GlobalInvocationID.x].temporal_w = 0;
-    raygenIn[gl_GlobalInvocationID.x].spacial_M = 0;
-    raygenIn[gl_GlobalInvocationID.x].spacial_W = 0;
-    raygenIn[gl_GlobalInvocationID.x].spacial_w = 0;
+    RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    clear_reservoirs(rg);
+    raygenIn[gl_GlobalInvocationID.x] = rg;
 }
 
 void initialize_sample(int rx, int ry) {
     RayGenerator rg = raygenIn[gl_GlobalInvocationID.x];
+    rg.initial_pdf = 0.0;
+    rg.initial_flags = 0u;
+    rg.initial_x_s = vec3(0.0);
+    rg.initial_n_s = vec3(0.0);
+    rg.initial_Lo = vec3(0.0);
     Ray initial_ray = create_ray(vec2(rx, ry));
     uint hitid = -1;
     Hit h = trace(initial_ray, hitid);
@@ -512,34 +501,57 @@ void initialize_sample(int rx, int ry) {
         vec3 wi, f;
         float pdf;
         float ior = 1.0;
-        uint medium = -1;
+        uint medium = NO_MEDIUM;
         int wavelength = -1;
         rg.initial_mat = h.material;
         if (materialIn[h.material].emission != vec3(0.0)) {
             rg.initial_pdf = 1.0;
+            rg.initial_x_s = h.position;
+            rg.initial_n_s = h.normal;
             rg.initial_Lo = materialIn[h.material].emission;
             raygenIn[gl_GlobalInvocationID.x] = rg;
             return;
         }
-        if (ubo.directlighting != 0) rg.direct = sample_direct_light(-initial_ray.direction, h, materialIn[h.material]);
-        brdf(-initial_ray.direction, initial_ray.position, h, materialIn[h.material], wi, pdf, f, ior, medium, wavelength);
-        Ray secondary = { h.position + (h.normal) * EPS, wi };
+        if (direct_enabled() && ubo.emissivecount > 0) rg.direct = sample_direct_light(-initial_ray.direction, h, materialIn[h.material]);
+        bool sampled_diffuse_lobe;
+        brdf(-initial_ray.direction, initial_ray.position, h, materialIn[h.material], wi, pdf, f, sampled_diffuse_lobe, ior, medium, wavelength);
+        rg.initial_flags = initial_export_flags(h, rx, ry, sampled_diffuse_lobe);
+        if (pdf <= EPS || !finite_vec3(wi)) {
+            raygenIn[gl_GlobalInvocationID.x] = rg;
+            return;
+        }
+        Ray secondary = { offset_ray_origin(h.position, h.normal, wi), wi };
         hitid = -1;
         float hdist = -1.0;
-        rg.initial_pdf = pdf;
         Hit h2 = trace(secondary, hitid);
-        rg.initial_Lo = pathtrace(secondary, hitid, hdist);
+        if (h2.distance <= 0.0) {
+            raygenIn[gl_GlobalInvocationID.x] = rg;
+            return;
+        }
+        rg.initial_Lo = pathtrace(
+            secondary,
+            hitid,
+            hdist,
+            pdf,
+            h.position,
+            materialIn[h.material].model == LAMBERTIAN_MODEL && direct_enabled() && ubo.emissivecount > 0);
+        if (!valid_radiance(rg.initial_Lo)) {
+            rg.initial_Lo = vec3(0.0);
+            raygenIn[gl_GlobalInvocationID.x] = rg;
+            return;
+        }
+        rg.initial_pdf = pdf;
         rg.initial_x_s = h2.position;
         rg.initial_n_s = h2.normal;
     } else {
         rg.initial_mat = 0;
+        rg.initial_flags = 0u;
         rg.initial_x_v = vec3(0.0);
+        rg.initial_n_v = vec3(0.0);
         rg.initial_x_s = vec3(0.0);
         rg.initial_n_s = vec3(0.0);
         rg.initial_Lo = vec3(0.0);
-        rg.temporal_Lo = vec3(0.0);
-        rg.spacial_Lo = vec3(0.0);
-        hard_reset();
+        clear_reservoirs(rg);
     }
     raygenIn[gl_GlobalInvocationID.x] = rg;
 }
@@ -547,26 +559,28 @@ void initialize_sample(int rx, int ry) {
 void clamp_reservoirs() {
     float oldM = float(raygenIn[gl_GlobalInvocationID.x].temporal_M);
     if (oldM != 0) {
-        raygenIn[gl_GlobalInvocationID.x].temporal_M = min(int(oldM), ubo.contributioncap);
-        raygenIn[gl_GlobalInvocationID.x].temporal_w *= (raygenIn[gl_GlobalInvocationID.x].temporal_M / oldM);
-        raygenIn[gl_GlobalInvocationID.x].temporal_W *= (raygenIn[gl_GlobalInvocationID.x].temporal_M / oldM);
+        raygenIn[gl_GlobalInvocationID.x].temporal_M = min(uint(oldM), max(ubo.temporal_m_cap, 1u));
+        raygenIn[gl_GlobalInvocationID.x].temporal_w *= (float(raygenIn[gl_GlobalInvocationID.x].temporal_M) / oldM);
+        raygenIn[gl_GlobalInvocationID.x].temporal_W *= (float(raygenIn[gl_GlobalInvocationID.x].temporal_M) / oldM);
     }
-    oldM = float(raygenIn[gl_GlobalInvocationID.x].spacial_M);
+    oldM = float(raygenIn[gl_GlobalInvocationID.x].spatial_M);
     if (oldM != 0) {
-        raygenIn[gl_GlobalInvocationID.x].spacial_M = min(int(oldM), ubo.contributioncap);
-        raygenIn[gl_GlobalInvocationID.x].spacial_w *= (raygenIn[gl_GlobalInvocationID.x].spacial_M / oldM);
-        raygenIn[gl_GlobalInvocationID.x].spacial_W *= (raygenIn[gl_GlobalInvocationID.x].spacial_M / oldM);
+        raygenIn[gl_GlobalInvocationID.x].spatial_M = min(uint(oldM), max(ubo.spatial_m_cap, 1u));
+        raygenIn[gl_GlobalInvocationID.x].spatial_w *= (float(raygenIn[gl_GlobalInvocationID.x].spatial_M) / oldM);
+        raygenIn[gl_GlobalInvocationID.x].spatial_W *= (float(raygenIn[gl_GlobalInvocationID.x].spatial_M) / oldM);
     }
 }
 
 void main() {
     uint pixelCount = uint(ubo.width) * uint(ubo.height);
     if (gl_GlobalInvocationID.x >= pixelCount) return;
-	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
+    int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
     init_random(rx, ry);
-    if (raygenIn[gl_GlobalInvocationID.x].initial_n_v == vec3(0.0)) hard_reset();
-    if (ubo.samples == 0) hard_reset();
+    if (!restir_enabled()) {
+        return;
+    }
+    if (ubo.resetreservoirs != 0 || raygenIn[gl_GlobalInvocationID.x].initial_n_v == vec3(0.0)) hard_reset();
     initialize_sample(rx, ry);
     clamp_reservoirs();
 }

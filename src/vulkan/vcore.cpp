@@ -6,21 +6,6 @@
 
 namespace VSTIR {
 
-    void VCore::InitializeBridge() {
-        VUTILS::CreateBuffer(
-            _render_width * _render_height * 4, VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
-            &m_Bridge);
-        vkMapMemory(_interface, m_Bridge.memory, 0, VK_WHOLE_SIZE, 0, &(_swapchain.reference));
-    }
-
-    void VCore::RecreateBridge() {
-        vkUnmapMemory(_interface, m_Bridge.memory);
-        VUTILS::DestroyBuffer(m_Bridge);
-        m_Bridge = {};
-        InitializeBridge();
-    }
-
     void VCore::Reconstruct() {
         VUTILS::DestroyBuffer(m_Geometry.bvh);
         VUTILS::DestroyBuffer(m_Geometry.normals);
@@ -35,11 +20,12 @@ namespace VSTIR {
     void VCore::InitializeShaders() {
         #define ADDSHADER(name) m_Shaders.push_back(VSHADERS::GenerateShader(std::string("shaders/") + std::string(name) + std::string(".comp"), std::string("build/bin/shaders/") + std::string(name) + std::string(".comp.spv")))
         ADDSHADER("render");
-        ADDSHADER("resevoir");
+        ADDSHADER("reservoir");
         ADDSHADER("temporal");
-        ADDSHADER("spacial");
+        ADDSHADER("spatial");
         ADDSHADER("compile");
         ADDSHADER("bilateral");
+        ADDSHADER("history");
         ADDSHADER("merge");
         #undef ADDSHADER
     }
@@ -75,7 +61,6 @@ namespace VSTIR {
         m_General.Initialize();
         InitializeGeometry();
         m_Scheduler.Initialize();
-        InitializeBridge();
         m_Context.Initialize();
     }
 

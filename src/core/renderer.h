@@ -26,10 +26,11 @@ namespace VSTIR {
 
         float depththreshold = 0.03f;
         float normalthreshold = 0.95f;
-        int contributioncap = 20;
-        int candidatecap = 2;
+        int temporal_m_cap = 30;
+        int spatial_m_cap = 500;
         int spacerange = 5;
         int spacecount = 5;
+        int restir_bounces = 2;
         bool bilateral = false;
         bool bilateral_right = false;
         bool directlighting = true;

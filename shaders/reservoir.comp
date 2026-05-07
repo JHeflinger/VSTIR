@@ -42,7 +42,6 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 #include "bvh.glsl"
 
 const float max_contribution = 10;
-const uint RESERVOIR_FLAG_EXPORTABLE = 1u;
 const float PI = 3.14159265358979323846;
 const uint NO_MEDIUM = 0xffffffffu;
 uvec4 seed = uvec4(0);
@@ -107,7 +106,11 @@ bool valid_radiance(vec3 v) {
 }
 
 vec3 clamp_contribution(vec3 v) {
-    return min(max(v, vec3(0.0)), vec3(max_contribution));
+    if (!finite_vec3(v)) return vec3(0.0);
+    v = max(v, vec3(0.0));
+    float peak = max(max(v.r, v.g), v.b);
+    if (peak <= max_contribution) return v;
+    return v * (max_contribution / peak);
 }
 
 vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
@@ -158,12 +161,15 @@ bool primary_hit_matches(Hit center, int nx, int ny) {
     return true;
 }
 
-uint initial_export_flags(Hit center, int rx, int ry) {
+uint initial_export_flags(Hit center, int rx, int ry, bool sampled_diffuse_lobe) {
+    if (!sampled_diffuse_lobe || !restir_diffuse_safe_material(materialIn[center.material])) {
+        return 0u;
+    }
     bool stable = primary_hit_matches(center, rx - 1, ry) &&
         primary_hit_matches(center, rx + 1, ry) &&
         primary_hit_matches(center, rx, ry - 1) &&
         primary_hit_matches(center, rx, ry + 1);
-    return stable ? RESERVOIR_FLAG_EXPORTABLE : 0u;
+    return stable ? (RESTIR_FLAG_EXPORTABLE | RESTIR_FLAG_DIFFUSE_REUSE) : 0u;
 }
 
 float russian_roulette(vec3 throughput) {
@@ -238,10 +244,11 @@ vec3 lambertian_throughput(in vec3 outgoing, in vec3 normal, in vec3 incoming, i
         max(0.0, dot(incoming, normal));
 }
 
-void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, inout float ior, inout uint medium, inout int wavelength) {
+void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, out vec3 incoming, out float pdf, out vec3 throughput, out bool sampled_diffuse_lobe, inout float ior, inout uint medium, inout int wavelength) {
     incoming = vec3(0.0);
     pdf = 0.0;
     throughput = vec3(0.0);
+    sampled_diffuse_lobe = false;
     switch (material.model) {
         case LAMBERTIAN_MODEL:
             float ks = luminance(material.specular);
@@ -251,7 +258,8 @@ void brdf(in vec3 outgoing, in vec3 previous, in Hit h, in Material material, ou
             float pd = kd/kskd;
             float ps = ks/kskd;
             vec3 R = reflect(-outgoing, h.normal);
-            incoming = random() < pd ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
+            sampled_diffuse_lobe = random() < pd;
+            incoming = sampled_diffuse_lobe ? onb(h.normal, sample_cosine_weighted_lobe()) : onb(R, sample_specular_phong_lobe(material.shiny));
             throughput = 
                 ((material.diffuse / PI) +
                 (material.specular * (material.shiny + 2.0) /
@@ -393,7 +401,8 @@ vec3 pathtrace(
     bool previous_direct_sampling = initial_direct_sampling;
     float previous_bsdf_pdf = initial_bsdf_pdf;
     vec3 previous_position = initial_previous_position;
-    for (uint i = 0; i < MAX_BOUNCES; i++) {
+    uint max_bounces = clamp(ubo.restir_bounces, 1u, uint(MAX_BOUNCES));
+    for (uint i = 0; i < max_bounces; i++) {
         Hit h = trace(ray, hid);
         if (firsthit) {
             firsthit = false;
@@ -415,10 +424,12 @@ vec3 pathtrace(
             vec3 direct = sample_direct_light(-ray.direction, h, material);
             radiance += clamp_contribution(throughput * direct);
         }
+        if (i + 1u >= max_bounces) break;
         vec3 incoming;
         vec3 color;
         float pdf;
-        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, ior, medium, wavelength);
+        bool sampled_diffuse_lobe;
+        brdf(-ray.direction, ray.position, h, material, incoming, pdf, color, sampled_diffuse_lobe, ior, medium, wavelength);
         if (pdf <= 0) break;
         throughput *= color / pdf;
         throughput = min(throughput, max_contribution);
@@ -487,7 +498,6 @@ void initialize_sample(int rx, int ry) {
     if (h.distance >= 0.0) {
         rg.initial_x_v = h.position;
         rg.initial_n_v = h.normal;
-        rg.initial_flags = initial_export_flags(h, rx, ry);
         vec3 wi, f;
         float pdf;
         float ior = 1.0;
@@ -503,7 +513,9 @@ void initialize_sample(int rx, int ry) {
             return;
         }
         if (direct_enabled() && ubo.emissivecount > 0) rg.direct = sample_direct_light(-initial_ray.direction, h, materialIn[h.material]);
-        brdf(-initial_ray.direction, initial_ray.position, h, materialIn[h.material], wi, pdf, f, ior, medium, wavelength);
+        bool sampled_diffuse_lobe;
+        brdf(-initial_ray.direction, initial_ray.position, h, materialIn[h.material], wi, pdf, f, sampled_diffuse_lobe, ior, medium, wavelength);
+        rg.initial_flags = initial_export_flags(h, rx, ry, sampled_diffuse_lobe);
         if (pdf <= EPS || !finite_vec3(wi)) {
             raygenIn[gl_GlobalInvocationID.x] = rg;
             return;
@@ -547,15 +559,15 @@ void initialize_sample(int rx, int ry) {
 void clamp_reservoirs() {
     float oldM = float(raygenIn[gl_GlobalInvocationID.x].temporal_M);
     if (oldM != 0) {
-        raygenIn[gl_GlobalInvocationID.x].temporal_M = min(int(oldM), ubo.contributioncap);
-        raygenIn[gl_GlobalInvocationID.x].temporal_w *= (raygenIn[gl_GlobalInvocationID.x].temporal_M / oldM);
-        raygenIn[gl_GlobalInvocationID.x].temporal_W *= (raygenIn[gl_GlobalInvocationID.x].temporal_M / oldM);
+        raygenIn[gl_GlobalInvocationID.x].temporal_M = min(uint(oldM), max(ubo.temporal_m_cap, 1u));
+        raygenIn[gl_GlobalInvocationID.x].temporal_w *= (float(raygenIn[gl_GlobalInvocationID.x].temporal_M) / oldM);
+        raygenIn[gl_GlobalInvocationID.x].temporal_W *= (float(raygenIn[gl_GlobalInvocationID.x].temporal_M) / oldM);
     }
     oldM = float(raygenIn[gl_GlobalInvocationID.x].spatial_M);
     if (oldM != 0) {
-        raygenIn[gl_GlobalInvocationID.x].spatial_M = min(int(oldM), ubo.contributioncap);
-        raygenIn[gl_GlobalInvocationID.x].spatial_w *= (raygenIn[gl_GlobalInvocationID.x].spatial_M / oldM);
-        raygenIn[gl_GlobalInvocationID.x].spatial_W *= (raygenIn[gl_GlobalInvocationID.x].spatial_M / oldM);
+        raygenIn[gl_GlobalInvocationID.x].spatial_M = min(uint(oldM), max(ubo.spatial_m_cap, 1u));
+        raygenIn[gl_GlobalInvocationID.x].spatial_w *= (float(raygenIn[gl_GlobalInvocationID.x].spatial_M) / oldM);
+        raygenIn[gl_GlobalInvocationID.x].spatial_W *= (float(raygenIn[gl_GlobalInvocationID.x].spatial_M) / oldM);
     }
 }
 

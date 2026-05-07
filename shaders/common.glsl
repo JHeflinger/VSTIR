@@ -74,6 +74,9 @@ struct RayGenerator {
     uint spatial_flags;
     vec3 direct;
     vec3 filtered;
+    vec3 filtered_tmp;
+    vec3 direct_filtered;
+    vec3 direct_filtered_tmp;
 };
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -93,10 +96,11 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 currentvpm;
     float depththreshold;
     float normalthreshold;
-    uint contributioncap;
-    uint candidatecap;
+    uint temporal_m_cap;
+    uint spatial_m_cap;
     uint spacerange;
     uint spacecount;
+    uint restir_bounces;
     uint emissivecount;
     uint directlighting;
     uint divider;
@@ -109,5 +113,76 @@ layout(binding = 0) uniform UniformBufferObject {
     uint restirframes;
     uint resetreservoirs;
 } ubo;
+
+const float RESTIR_EPS = 0.000001;
+const float RESTIR_PI = 3.14159265358979323846;
+const float RESTIR_MAX_RECONNECTION_CORRECTION = 10.0;
+const float RESTIR_DIFFUSE_SPECULAR_LIMIT = 0.05;
+const uint RESTIR_LAMBERTIAN_MODEL = 2u;
+const uint RESTIR_FLAG_EXPORTABLE = 1u;
+const uint RESTIR_FLAG_DIFFUSE_REUSE = 2u;
+
+float restir_luminance(vec3 c) {
+    return 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+}
+
+bool restir_finite_vec3(vec3 v) {
+    return !any(isnan(v)) && !any(isinf(v));
+}
+
+bool restir_valid_radiance(vec3 v) {
+    return restir_finite_vec3(v) && restir_luminance(v) > RESTIR_EPS;
+}
+
+vec3 restir_offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
+    return position + normal * (dot(normal, direction) >= 0.0 ? RESTIR_EPS : -RESTIR_EPS);
+}
+
+bool restir_diffuse_safe_material(Material material) {
+    return material.model == RESTIR_LAMBERTIAN_MODEL &&
+        restir_luminance(material.diffuse) > RESTIR_EPS &&
+        restir_luminance(material.specular) <= RESTIR_DIFFUSE_SPECULAR_LIMIT;
+}
+
+vec3 restir_diffuse_throughput(vec3 normal, vec3 incoming, Material material) {
+    return (material.diffuse / RESTIR_PI) * max(0.0, dot(incoming, normal));
+}
+
+float restir_target_luminance(vec3 Lo) {
+    return restir_valid_radiance(Lo) ? restir_luminance(Lo) : 0.0;
+}
+
+float restir_contribution_target_luminance(vec3 x_v, vec3 n_v, vec3 x_s, vec3 Lo, Material material) {
+    if (!restir_valid_radiance(Lo) || !restir_diffuse_safe_material(material)) return 0.0;
+    vec3 delta = x_s - x_v;
+    if (length(delta) <= RESTIR_EPS) return 0.0;
+    vec3 wi = normalize(delta);
+    vec3 contribution = restir_diffuse_throughput(n_v, wi, material) * Lo;
+    if (!restir_finite_vec3(contribution)) return 0.0;
+    return max(restir_luminance(contribution), 0.0);
+}
+
+float restir_reconnection_jacobian(vec3 source_x_v, vec3 target_x_v, vec3 x_s, vec3 n_s) {
+    vec3 source_delta = source_x_v - x_s;
+    vec3 target_delta = target_x_v - x_s;
+    float source_dist = length(source_delta);
+    float target_dist = length(target_delta);
+    if (source_dist <= RESTIR_EPS || target_dist <= RESTIR_EPS) return 0.0;
+    vec3 source_dir = source_delta / source_dist;
+    vec3 target_dir = target_delta / target_dist;
+    float source_cos = clamp(abs(dot(n_s, source_dir)), 0.0, 1.0);
+    float target_cos = clamp(abs(dot(n_s, target_dir)), 0.0, 1.0);
+    if (source_cos <= RESTIR_EPS || target_cos <= RESTIR_EPS) return 0.0;
+    float J = (source_dist * source_dist) / (target_dist * target_dist) * (target_cos / source_cos);
+    return (J > RESTIR_EPS && !isnan(J) && !isinf(J)) ? J : 0.0;
+}
+
+float restir_reconnection_correction(vec3 source_x_v, vec3 target_x_v, vec3 x_s, vec3 n_s) {
+    float J = restir_reconnection_jacobian(source_x_v, target_x_v, x_s, n_s);
+    if (J <= RESTIR_EPS) return 0.0;
+    float correction = 1.0 / J;
+    return (!isnan(correction) && !isinf(correction)) ?
+        min(correction, RESTIR_MAX_RECONNECTION_CORRECTION) : 0.0;
+}
 
 #endif

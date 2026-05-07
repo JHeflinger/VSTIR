@@ -52,32 +52,80 @@ bool filter_enabled() {
     return ((right_side() ? ubo.filtersright : ubo.filters) & 1u) != 0;
 }
 
+vec3 read_filter_input(RayGenerator rg) {
+    return ((pc.atrous_level & 1u) == 1u) ? rg.filtered_tmp : rg.filtered;
+}
+
+vec3 read_direct_filter_input(RayGenerator rg) {
+    return ((pc.atrous_level & 1u) == 1u) ? rg.direct_filtered_tmp : rg.direct_filtered;
+}
+
+void write_filter_outputs(uint idx, vec3 indirect, vec3 direct) {
+    if ((pc.atrous_level & 1u) == 0u) {
+        raygenIn[idx].filtered_tmp = indirect;
+        raygenIn[idx].direct_filtered_tmp = direct;
+    } else {
+        raygenIn[idx].filtered = indirect;
+        raygenIn[idx].direct_filtered = direct;
+    }
+}
+
+vec3 local_initial_indirect(RayGenerator rg);
+
 void decompose_reservoir(uint idx, out vec3 indirect, out vec3 direct) {
     RayGenerator rg = raygenIn[idx];
     direct = rg.direct;
     if (rg.initial_pdf == 1.0) {
-        indirect = finite_vec3(rg.spatial_Lo) ? rg.spatial_Lo : vec3(0.0);
+        indirect = finite_vec3(rg.initial_Lo) ? rg.initial_Lo : vec3(0.0);
+        return;
+    }
+    Material mat = materialIn[rg.initial_mat];
+    if (!restir_diffuse_safe_material(mat)) {
+        indirect = local_initial_indirect(rg);
         return;
     }
     if (rg.spatial_M == 0 || rg.spatial_W <= 0.0 ||
-        rg.spatial_x_s == rg.spatial_x_v ||
+        length(rg.spatial_x_s - rg.spatial_x_v) <= EPS ||
         length(ubo.position - rg.spatial_x_v) < EPS ||
         !finite_vec3(rg.spatial_Lo)) {
-        indirect = vec3(0.0);
+        indirect = local_initial_indirect(rg);
         return;
     }
     vec3 wi = normalize(rg.spatial_x_s - rg.spatial_x_v);
-    vec3 wo = normalize(ubo.position - rg.spatial_x_v);
-    Material mat = materialIn[rg.initial_mat];
-    vec3 brdf_cos = ((mat.diffuse / PI) +
-        (mat.specular * (mat.shiny + 2.0) / (2.0 * PI) *
-         pow(max(dot(reflect(-wo, rg.spatial_n_v), wi), 0.0), mat.shiny))) *
-        max(dot(wi, rg.spatial_n_v), 0.0);
+    vec3 brdf_cos = restir_diffuse_throughput(rg.spatial_n_v, wi, mat);
     indirect = brdf_cos * rg.spatial_Lo * rg.spatial_W;
     if (!finite_vec3(indirect)) indirect = vec3(0.0);
 }
 
-vec3 bilateral_kernel(int rx, int ry, int stride, vec3 centre_colour, vec3 centre_normal, float centre_depth, float sigma_lum, bool use_confidence, bool is_level0) {
+vec3 local_initial_indirect(RayGenerator rg) {
+    if (rg.initial_pdf <= EPS ||
+        !finite_vec3(rg.initial_Lo) ||
+        length(rg.initial_x_s - rg.initial_x_v) <= EPS ||
+        length(ubo.position - rg.initial_x_v) <= EPS) {
+        return vec3(0.0);
+    }
+    vec3 wi = normalize(rg.initial_x_s - rg.initial_x_v);
+    vec3 wo = normalize(ubo.position - rg.initial_x_v);
+    Material mat = materialIn[rg.initial_mat];
+    vec3 brdf_cos = ((mat.diffuse / PI) +
+        (mat.specular * (mat.shiny + 2.0) / (2.0 * PI) *
+         pow(max(dot(reflect(-wo, rg.initial_n_v), wi), 0.0), mat.shiny))) *
+        max(dot(wi, rg.initial_n_v), 0.0);
+    vec3 indirect = brdf_cos * rg.initial_Lo / rg.initial_pdf;
+    return finite_vec3(indirect) ? indirect : vec3(0.0);
+}
+
+vec3 bilateral_kernel(
+    int rx,
+    int ry,
+    int stride,
+    vec3 centre_colour,
+    vec3 centre_normal,
+    float centre_depth,
+    uint centre_mat,
+    float sigma_lum,
+    bool filter_direct,
+    bool is_level0) {
     float inv2SigSpatSq = 1.0 / (2.0 * SIGMA_SPATIAL * SIGMA_SPATIAL);
     float inv2SigDepSq = 1.0 / (2.0 * SIGMA_DEPTH * SIGMA_DEPTH);
     float inv2SigLumSq = 1.0 / (2.0 * sigma_lum * sigma_lum);
@@ -94,30 +142,27 @@ vec3 bilateral_kernel(int rx, int ry, int stride, vec3 centre_colour, vec3 centr
             uint nIdx = uint(ny) * uint(ubo.width) + uint(nx);
             RayGenerator nb = raygenIn[nIdx];
             if (nb.initial_n_v == vec3(0.0)) continue;
+            if (nb.initial_mat != centre_mat) continue;
             vec3 nb_colour;
             if (is_level0) {
                 vec3 nb_indirect, nb_direct;
                 decompose_reservoir(nIdx, nb_indirect, nb_direct);
-                nb_colour = use_confidence ? nb_indirect : nb_direct;
+                nb_colour = filter_direct ? nb_direct : nb_indirect;
             } else {
-                nb_colour = nb.filtered;
+                nb_colour = filter_direct ? read_direct_filter_input(nb) : read_filter_input(nb);
             }
             if (any(isnan(nb_colour)) || any(isinf(nb_colour))) continue;
             float dist2 = float(dx * dx + dy * dy);
             float w_spatial = exp(-dist2 * inv2SigSpatSq);
-            float ndot = max(dot(centre_normal, nb.spatial_n_v), 0.0);
+            float ndot = max(dot(centre_normal, nb.initial_n_v), 0.0);
             float w_normal = pow(ndot, SIGMA_NORMAL);
-            float nb_depth = length(nb.spatial_x_v - ubo.position);
+            float nb_depth = length(nb.initial_x_v - ubo.position);
             float depth_diff = abs(centre_depth - nb_depth) / (centre_depth + EPS);
             float w_depth = exp(-depth_diff * depth_diff * inv2SigDepSq);
             float nb_log_lum = log(luminance(nb_colour) + 1.0);
             float lum_diff = centre_log_lum - nb_log_lum;
             float w_lum = exp(-lum_diff * lum_diff * inv2SigLumSq);
-            float w_conf = 1.0;
-            if (use_confidence) {
-                w_conf = clamp(float(nb.spatial_M) / float(max(ubo.contributioncap, 1u)), 0.0, 1.0);
-            }
-            float w = w_spatial * w_normal * w_depth * w_lum * w_conf;
+            float w = w_spatial * w_normal * w_depth * w_lum;
             if (w < EPS) continue;
             colour_sum += w * nb_colour;
             weight_sum += w;
@@ -139,7 +184,7 @@ void main() {
     bool is_last = (pc.atrous_level == uint(NUM_ATROUS_LEVELS - 1));
     bool is_level0 = (pc.atrous_level == 0u);
     if (center.initial_n_v == vec3(0.0)) {
-        raygenIn[cIdx].filtered = vec3(0.0);
+        write_filter_outputs(cIdx, vec3(0.0), vec3(0.0));
         if (is_last) {
             if (ubo.samples == 0) raygenIn[cIdx].accumulation = vec3(0.0);
             imageStore(restirImage, ivec2(rx, ry), vec4(0.0, 0.0, 0.0, 1.0));
@@ -147,34 +192,41 @@ void main() {
         return;
     }
 
-    vec3 centre_normal = center.spatial_n_v;
-    float centre_depth = length(center.spatial_x_v - ubo.position);
-    vec3 centre_colour;
-
-    if (is_level0) {
-        vec3 centre_indirect, centre_direct;
-        decompose_reservoir(cIdx, centre_indirect, centre_direct);
-        vec3 filtered_indirect = bilateral_kernel(
-            rx, ry, stride,
-            centre_indirect, centre_normal, centre_depth,
-            SIGMA_LUM_INDIRECT, true, true);
-        vec3 filtered_direct = bilateral_kernel(
-            rx, ry, stride,
-            centre_direct, centre_normal, centre_depth,
-            SIGMA_LUM_DIRECT, false, true);
-        centre_colour = filtered_indirect + filtered_direct;
-    } else {
-        centre_colour = center.filtered;
-        centre_colour = bilateral_kernel(
-            rx, ry, stride,
-            centre_colour, centre_normal, centre_depth,
-            SIGMA_LUM_INDIRECT, true, false);
+    if (center.initial_pdf == 1.0) {
+        vec3 emission = finite_vec3(center.initial_Lo) ? center.initial_Lo : vec3(0.0);
+        write_filter_outputs(cIdx, vec3(0.0), vec3(0.0));
+        if (is_last) {
+            if (ubo.samples == 0) raygenIn[cIdx].accumulation = vec3(0.0);
+            raygenIn[cIdx].accumulation += emission;
+            vec3 color = raygenIn[cIdx].accumulation / float(ubo.samples + 1);
+            vec3 hdr = (color * ((color / 20.0) + vec3(1.0))) / (vec3(1.0) + color);
+            hdr = pow(hdr, vec3(1.0 / 2.2));
+            imageStore(restirImage, ivec2(rx, ry), vec4(hdr, 1.0));
+        }
+        return;
     }
 
-    raygenIn[cIdx].filtered = centre_colour;
+    vec3 centre_normal = center.initial_n_v;
+    float centre_depth = length(center.initial_x_v - ubo.position);
+    vec3 centre_indirect, centre_direct;
+    decompose_reservoir(cIdx, centre_indirect, centre_direct);
+
+    vec3 centre_indirect_input = is_level0 ? centre_indirect : read_filter_input(center);
+    vec3 centre_direct_input = is_level0 ? centre_direct : read_direct_filter_input(center);
+    vec3 filtered_indirect = bilateral_kernel(
+        rx, ry, stride,
+        centre_indirect_input, centre_normal, centre_depth, center.initial_mat,
+        SIGMA_LUM_INDIRECT, false, is_level0);
+    vec3 filtered_direct = bilateral_kernel(
+        rx, ry, stride,
+        centre_direct_input, centre_normal, centre_depth, center.initial_mat,
+        SIGMA_LUM_DIRECT, true, is_level0);
+
+    write_filter_outputs(cIdx, filtered_indirect, filtered_direct);
     if (is_last) {
+        vec3 final_colour = filtered_indirect + filtered_direct;
         if (ubo.samples == 0) raygenIn[cIdx].accumulation = vec3(0.0);
-        raygenIn[cIdx].accumulation += centre_colour;
+        raygenIn[cIdx].accumulation += final_colour;
         vec3 color = raygenIn[cIdx].accumulation / float(ubo.samples + 1);
         vec3 hdr = (color * ((color / 20.0) + vec3(1.0))) / (vec3(1.0) + color);
         hdr = pow(hdr, vec3(1.0 / 2.2));

@@ -154,7 +154,11 @@ float luminance(vec3 c) {
 }
 
 vec3 clamp_contribution(vec3 v) {
-    return min(max(v, vec3(0.0)), vec3(max_contribution));
+    if (any(isnan(v)) || any(isinf(v))) return vec3(0.0);
+    v = max(v, vec3(0.0));
+    float peak = max(max(v.r, v.g), v.b);
+    if (peak <= max_contribution) return v;
+    return v * (max_contribution / peak);
 }
 
 vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {

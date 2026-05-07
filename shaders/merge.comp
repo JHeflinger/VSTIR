@@ -1,37 +1,6 @@
 #version 450
-
-layout(binding = 0) uniform UniformBufferObject {
-    vec3 look;
-    vec3 position;
-    vec3 up;
-    vec3 u;
-    vec3 v;
-    vec3 w;
-    uint triangles;
-    uint seed;
-    uint samples;
-    float fov;
-    float width;
-    float height;
-    mat4 previousvpm;
-    float depththreshold;
-    float normalthreshold;
-    uint contributioncap;
-    uint candidatecap;
-    uint spacerange;
-    uint spacecount;
-    uint emissivecount;
-    uint directlighting;
-    uint divider;
-    uint filters;
-    uint restir;
-    uint showdivider;
-    uint directlightingright;
-    uint filtersright;
-    uint restirright;
-    uint restirframes;
-    uint resetreservoirs;
-} ubo;
+#extension GL_GOOGLE_include_directive : enable
+#include "common.glsl"
 
 layout(binding = 1, rgba8) uniform image2D outputImage;
 

@@ -358,4 +358,3 @@ void extract_from_yspace(
         }
     }
 }
-

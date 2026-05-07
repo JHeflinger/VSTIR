@@ -60,4 +60,3 @@ void extract_from_yspace(
         std::vector<float>& b
         );
 #endif
-

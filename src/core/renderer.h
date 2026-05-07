@@ -54,7 +54,6 @@ namespace VSTIR {
         RenderSettings& GetSettings() { return m_settings; }
     private:
         void RecordCommand(uint32_t imageIndex);
-        bool ConstructOBJ(const StateOBJ state);
     private:
         CPUSwap m_Swapchain;
         Backend m_Backend;

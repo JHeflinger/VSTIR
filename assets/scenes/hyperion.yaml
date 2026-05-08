@@ -1,0 +1,290 @@
+version: 1
+name: hyperion
+
+camera:
+  position: [-15.0, 15.0, 0.0]
+  look: [0.0, 0.0, 0.0]
+  up: [0.0, 1.0, 0.0]
+  fov_degrees: 60.0
+  orbiting: true
+  orbit_target: [0.0, 0.0, 0.0]
+
+materials:
+  - name: black
+    Kd: [0.0, 0.0, 0.0]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: orange
+    Kd: [1.0, 0.186, 0.0]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: glass
+    Kd: [1.0, 1.0, 1.0]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: silver
+    Kd: [0.9, 0.9, 0.9]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: ring_silver
+    Kd: [1.0, 1.0, 1.0]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: red
+    Kd: [1.0, 0.0, 0.0]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: off_white
+    Kd: [1.0, 0.94, 0.8]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: ping
+    Kd: [0.93, 0.89, 0.85]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: marb1
+    Kd: [0.026, 0.147, 0.075]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+  - name: marb2
+    Kd: [0.099, 0.24, 0.134]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1.0
+    illum: 2
+
+meshes:
+  - name: glass_ball
+    obj: ../models/hyperion/glass.obj
+    material: glass
+    transform:
+      translation: [-0.57, 1.87, 6.55]
+
+  - name: chrome_ball
+    obj: ../models/hyperion/chrome.obj
+    material: silver
+    transform:
+      translation: [0.4, 1.86, -6.59]
+
+  - name: platform
+    obj: ../models/hyperion/plate.obj
+    material: red
+    transform:
+      translation: [0.0, 0.36, 0.0]
+
+  - name: floor
+    obj: ../models/hyperion/floor.obj
+    material: red
+
+  - name: orange_ball
+    obj: ../models/hyperion/orange.obj
+    material: orange
+    transform:
+      translation: [1.646, 1.6861, 3.5662]
+
+  - name: ring_1
+    obj: ../models/hyperion/ring1.obj
+    material: ring_silver
+    transform:
+      translation: [-0.308737, 0.805763, -1.42968]
+
+  - name: ring_2
+    obj: ../models/hyperion/ring2.obj
+    material: ring_silver
+    transform:
+      translation: [-0.6706, 0.808472, 0.626798]
+
+  - name: ring_3
+    obj: ../models/hyperion/ring3.obj
+    material: ring_silver
+    transform:
+      translation: [-1.44541, 0.808472, 1.72607]
+
+  - name: marble_1
+    obj: ../models/hyperion/marb1.obj
+    material: marb1
+    transform:
+      translation: [-3.78, 0.88, -0.84]
+
+  - name: marble_2
+    obj: ../models/hyperion/marb2.obj
+    material: marb2
+    transform:
+      translation: [-3.746, 0.969453, 0.974294]
+
+  - name: ping_pong
+    obj: ../models/hyperion/pingpong.obj
+    material: ping
+    transform:
+      translation: [-3.14, 1.51, -4.12]
+
+lights:
+  - name: light_01
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -7.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_02
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -6.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_03
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -5.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_04
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -4.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_05
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -3.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_06
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -2.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_07
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -1.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_08
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, -0.75]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_09
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 0.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_10
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 1.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_11
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 2.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_12
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 3.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_13
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 4.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_14
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 5.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_15
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 6.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_16
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 7.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]
+
+  - name: light_17
+    type: emissive_quad
+    width: 4.08973
+    height: 0.5
+    emission: [5.0, 5.0, 5.0]
+    transform:
+      translation: [-0.004865, 5.0, 8.25]
+      rotation_degrees_xyz: [90.0, 0.0, 0.0]

@@ -1,0 +1,37 @@
+version: 1
+name: sample_scene
+
+camera:
+  position: [0.0, 2.133, 2.11]
+  look: [0.0, 0.0, 1.0]
+  up: [0.0, 1.0, 0.0]
+  fov_degrees: 90.0
+  orbiting: true
+  orbit_target: [0.0, 0.0, 0.0]
+
+
+materials:
+  - name: white
+    Kd: [1.0, 1.0, 1.0]
+    Ks: [0.0, 0.0, 0.0]
+    Ns: 1000.0
+    illum: 2
+
+
+
+meshes:
+  - name: side_lit_box
+    obj: ../models/side_lit_empty_box.obj
+    transform:
+      scale: [1, 1, 1]    
+
+  - name: teapo_lid
+    obj: ../models/teapot/lid.obj
+    material: white
+    transform:
+      scale: [.2, .2, .2]
+  - name: teapo_body
+    obj: ../models/teapot/base.obj
+    material: white
+    transform:
+      scale: [.2, .2, .2]      

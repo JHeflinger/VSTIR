@@ -166,7 +166,9 @@ vec3 offset_ray_origin(vec3 position, vec3 normal, vec3 direction) {
 }
 
 bool right_side() {
-    return ubo.showdivider != 0 && int(gl_GlobalInvocationID.x % uint(ubo.width)) > int(ubo.divider);
+    int x = int(gl_GlobalInvocationID.x % uint(ubo.width));
+    int y = int(gl_GlobalInvocationID.x / uint(ubo.width));
+    return restir_divider_right_side_pixel(x, y);
 }
 
 bool direct_enabled() {

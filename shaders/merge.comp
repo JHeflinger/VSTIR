@@ -10,12 +10,12 @@ layout(binding = 3, rgba8) uniform image2D restirImage;
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-bool right_side_x(int x) {
-    return ubo.showdivider != 0 && x > int(ubo.divider);
+bool right_side_pixel(int x, int y) {
+    return restir_divider_right_side_pixel(x, y);
 }
 
-bool restir_enabled_x(int x) {
-    return (right_side_x(x) ? ubo.restirright : ubo.restir) != 0;
+bool restir_enabled_pixel(int x, int y) {
+    return (right_side_pixel(x, y) ? ubo.restirright : ubo.restir) != 0;
 }
 
 void main() {
@@ -23,9 +23,9 @@ void main() {
     if (gl_GlobalInvocationID.x >= pixelCount) return;
 	int rx = int(gl_GlobalInvocationID.x%int(ubo.width));
     int ry = int(gl_GlobalInvocationID.x/int(ubo.width));
-    if (ubo.showdivider != 0 && abs(int(ubo.divider) - rx) < 1) {
+    if (restir_divider_line_pixel(rx, ry)) {
         imageStore(outputImage, ivec2(rx, ry), vec4(1));
-    } else if (restir_enabled_x(rx)) {
+    } else if (restir_enabled_pixel(rx, ry)) {
         imageStore(outputImage, ivec2(rx, ry), imageLoad(restirImage, ivec2(rx, ry)));
     } else {
         imageStore(outputImage, ivec2(rx, ry), imageLoad(rawImage, ivec2(rx, ry)));

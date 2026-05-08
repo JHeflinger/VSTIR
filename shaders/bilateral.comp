@@ -36,12 +36,14 @@ bool finite_vec3(vec3 v) {
     return !any(isnan(v)) && !any(isinf(v));
 }
 
-bool right_side_x(int x) {
-    return ubo.showdivider != 0 && x > int(ubo.divider);
+bool right_side_pixel(int x, int y) {
+    return restir_divider_right_side_pixel(x, y);
 }
 
 bool right_side() {
-    return right_side_x(int(gl_GlobalInvocationID.x % uint(ubo.width)));
+    int x = int(gl_GlobalInvocationID.x % uint(ubo.width));
+    int y = int(gl_GlobalInvocationID.x / uint(ubo.width));
+    return right_side_pixel(x, y);
 }
 
 bool restir_enabled() {
@@ -138,7 +140,7 @@ vec3 bilateral_kernel(
             int ny = ry + dy * stride;
             if (nx < 0 || nx >= int(ubo.width) ||
                 ny < 0 || ny >= int(ubo.height)) continue;
-            if (ubo.showdivider != 0 && right_side_x(nx) != right_side_x(rx)) continue;
+            if (ubo.showdivider != 0 && right_side_pixel(nx, ny) != right_side_pixel(rx, ry)) continue;
             uint nIdx = uint(ny) * uint(ubo.width) + uint(nx);
             RayGenerator nb = raygenIn[nIdx];
             if (nb.initial_n_v == vec3(0.0)) continue;

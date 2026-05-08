@@ -104,6 +104,8 @@ layout(binding = 0) uniform UniformBufferObject {
     uint emissivecount;
     uint directlighting;
     uint divider;
+    float divider_position;
+    float divider_angle;
     uint filters;
     uint restir;
     uint showdivider;
@@ -183,6 +185,41 @@ float restir_reconnection_correction(vec3 source_x_v, vec3 target_x_v, vec3 x_s,
     float correction = 1.0 / J;
     return (!isnan(correction) && !isinf(correction)) ?
         min(correction, RESTIR_MAX_RECONNECTION_CORRECTION) : 0.0;
+}
+
+vec2 restir_divider_axis() {
+    float angle = radians(clamp(ubo.divider_angle, 0.0, 180.0));
+    return vec2(cos(angle), sin(angle));
+}
+
+float restir_divider_extent(vec2 axis) {
+    return 0.5 * (abs(axis.x) + abs(axis.y));
+}
+
+float restir_divider_coord(vec2 pixel, vec2 axis) {
+    vec2 denom = max(vec2(ubo.width - 1.0, ubo.height - 1.0), vec2(1.0));
+    vec2 uv = pixel / denom;
+    return dot(uv - vec2(0.5), axis);
+}
+
+float restir_divider_threshold(vec2 axis) {
+    float extent = restir_divider_extent(axis);
+    return mix(-extent, extent, clamp(ubo.divider_position, 0.0, 1.0));
+}
+
+bool restir_divider_right_side_pixel(int x, int y) {
+    if (ubo.showdivider == 0) return false;
+    vec2 axis = restir_divider_axis();
+    return restir_divider_coord(vec2(float(x), float(y)), axis) > restir_divider_threshold(axis);
+}
+
+bool restir_divider_line_pixel(int x, int y) {
+    if (ubo.showdivider == 0) return false;
+    vec2 axis = restir_divider_axis();
+    float coord = restir_divider_coord(vec2(float(x), float(y)), axis);
+    float threshold = restir_divider_threshold(axis);
+    float pixel_width = max(1.0 / max(ubo.width, 1.0), 1.0 / max(ubo.height, 1.0));
+    return abs(coord - threshold) <= pixel_width * 1.5;
 }
 
 #endif

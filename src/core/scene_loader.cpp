@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -112,6 +113,69 @@ static bool ParseMaterialNode(const YAML::Node& node, Material& out) {
     }
 
     return true;
+}
+
+static bool ParseNamedMaterials(
+    const YAML::Node& root,
+    std::unordered_map<std::string, Material>& outMaterials) {
+    const YAML::Node materialsNode = root["materials"];
+    if (!materialsNode) {
+        return true;
+    }
+
+    if (materialsNode.IsSequence()) {
+        for (size_t i = 0; i < materialsNode.size(); i++) {
+            const YAML::Node entry = materialsNode[i];
+            if (!entry || !entry.IsMap()) {
+                ERROR("Material entry %d must be a map", (int)i);
+                return false;
+            }
+            if (!entry["name"] || !entry["name"].IsScalar()) {
+                ERROR("Material entry %d is missing required scalar field 'name'", (int)i);
+                return false;
+            }
+
+            const std::string name = entry["name"].as<std::string>();
+            if (name.empty()) {
+                ERROR("Material entry %d has empty 'name'", (int)i);
+                return false;
+            }
+
+            Material mat{};
+            const YAML::Node matNode = entry["material"] ? entry["material"] : entry;
+            if (!ParseMaterialNode(matNode, mat)) {
+                ERROR("Material entry '%s' is not a valid material map", name.c_str());
+                return false;
+            }
+            outMaterials[name] = mat;
+        }
+        return true;
+    }
+
+    if (materialsNode.IsMap()) {
+        for (const auto& item : materialsNode) {
+            if (!item.first || !item.first.IsScalar()) {
+                ERROR("Materials map contains a non-scalar key");
+                return false;
+            }
+            if (!item.second || !item.second.IsMap()) {
+                ERROR("Material '%s' must map to a material object", item.first.as<std::string>().c_str());
+                return false;
+            }
+
+            const std::string name = item.first.as<std::string>();
+            Material mat{};
+            if (!ParseMaterialNode(item.second, mat)) {
+                ERROR("Material '%s' is not a valid material map", name.c_str());
+                return false;
+            }
+            outMaterials[name] = mat;
+        }
+        return true;
+    }
+
+    ERROR("Scene YAML field 'materials' must be a sequence or map");
+    return false;
 }
 
 static Transform ParseTransform(const YAML::Node& node) {
@@ -745,6 +809,11 @@ static bool LoadYAMLScene(const std::string& filepath, Geometry& geometry) {
         ApplyCamera(root["camera"]);
     }
 
+    std::unordered_map<std::string, Material> namedMaterials;
+    if (!ParseNamedMaterials(root, namedMaterials)) {
+        return false;
+    }
+
     if (root["meshes"]) {
         if (!root["meshes"].IsSequence()) {
             ERROR("Scene YAML field 'meshes' must be a sequence");
@@ -762,9 +831,36 @@ static bool LoadYAMLScene(const std::string& filepath, Geometry& geometry) {
             const std::string meshPath = ResolvePath(filepath, fileNode.as<std::string>());
             const std::string meshExt = ToLower(std::filesystem::path(meshPath).extension().string());
             const Transform transform = ParseTransform(mesh["transform"]);
+
             Material overrideMaterial{};
             const Material* overridePtr = nullptr;
-            if (ParseMaterialNode(mesh["material"], overrideMaterial)) {
+
+            std::string materialRef;
+            if (mesh["material_ref"]) {
+                if (!mesh["material_ref"].IsScalar()) {
+                    ERROR("Mesh entry %d field 'material_ref' must be a string", (int)i);
+                    return false;
+                }
+                materialRef = mesh["material_ref"].as<std::string>();
+            } else if (mesh["material_name"]) {
+                if (!mesh["material_name"].IsScalar()) {
+                    ERROR("Mesh entry %d field 'material_name' must be a string", (int)i);
+                    return false;
+                }
+                materialRef = mesh["material_name"].as<std::string>();
+            } else if (mesh["material"] && mesh["material"].IsScalar()) {
+                materialRef = mesh["material"].as<std::string>();
+            }
+
+            if (!materialRef.empty()) {
+                const auto it = namedMaterials.find(materialRef);
+                if (it == namedMaterials.end()) {
+                    ERROR("Mesh entry %d references unknown material '%s'", (int)i, materialRef.c_str());
+                    return false;
+                }
+                overrideMaterial = it->second;
+                overridePtr = &overrideMaterial;
+            } else if (ParseMaterialNode(mesh["material"], overrideMaterial)) {
                 overridePtr = &overrideMaterial;
             }
 

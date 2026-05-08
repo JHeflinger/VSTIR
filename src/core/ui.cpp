@@ -703,6 +703,14 @@ namespace VSTIR {
         ImGui::Text("  Show Divider:");
         ImGui::SameLine();
         render_settings_changed |= ImGui::Checkbox("##showdivider", &render_settings.show_divider);
+        if (render_settings.show_divider) {
+            ImGui::Text("  Divider Position:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderFloat("##dividerpos", &render_settings.divider_position, 0.0f, 1.0f, "%.3f");
+            ImGui::Text("  Divider Rotation:");
+            ImGui::SameLine();
+            render_settings_changed |= ImGui::SliderFloat("##dividerangle", &render_settings.divider_angle, 0.0f, 180.0f, "%.0f deg");
+        }
 
         auto toggle_row = [&](const char* label, const char* idLeft, bool* left, const char* idRight, bool* right) {
             ImGui::Text("%s", label);

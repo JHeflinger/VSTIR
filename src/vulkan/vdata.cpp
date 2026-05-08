@@ -221,6 +221,8 @@ namespace VSTIR {
 
         // divider
         ubo.divider = render_settings.resolution_scale * _viewport_width / 2.0f;
+        ubo.divider_position = render_settings.divider_position;
+        ubo.divider_angle = render_settings.divider_angle;
         ubo.showdivider = render_settings.show_divider ? 1 : 0;
 
         // filters

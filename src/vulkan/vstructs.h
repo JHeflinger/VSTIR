@@ -154,6 +154,8 @@ namespace VSTIR {
         alignas(4) uint32_t emissivecount;
         alignas(4) uint32_t directlighting;
         alignas(4) uint32_t divider;
+        alignas(4) float divider_position;
+        alignas(4) float divider_angle;
         alignas(4) uint32_t filters;
         alignas(4) uint32_t restir;
         alignas(4) uint32_t showdivider;

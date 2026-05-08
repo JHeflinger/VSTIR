@@ -21,6 +21,8 @@ namespace VSTIR {
 
         bool denoiser = false; // TODO implement
         bool show_divider = false;
+        float divider_position = 0.5f;
+        float divider_angle = 0.0f;
         bool restir = false;
         bool restir_right = false;
 
